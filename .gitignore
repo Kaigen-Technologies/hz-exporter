@@ -10,6 +10,7 @@ desktop.ini
 
 # Python
 tools/__pycache__/
+tools/__pycache__.meta
 tools/*.pyc
 
 # Unity package cache (generated when symlinked into a project)
