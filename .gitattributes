@@ -1,0 +1,23 @@
+# Unity YAML merge
+*.meta merge=unityyamlmerge eol=lf
+*.asmdef merge=unityyamlmerge eol=lf
+
+# Text
+*.cs text diff=csharp eol=lf
+*.shader text eol=lf
+*.hlsl text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.exr binary
+*.hdr binary
+*.dll binary
+*.dylib binary
+*.so binary

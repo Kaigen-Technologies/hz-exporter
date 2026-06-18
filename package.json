@@ -1,0 +1,11 @@
+{
+  "name": "com.hz.exporter",
+  "version": "0.1.0",
+  "displayName": "HZ Exporter",
+  "description": "Exports Unity scenes to hz-engine-v5 binary asset format.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.6.0",
+    "com.unity.entities": "6.5.0"
+  }
+}

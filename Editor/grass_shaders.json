@@ -1,0 +1,6 @@
+{
+  "_comment": "Shaders that should get a `<name>_grass.hz.glsl` sibling emitted by HZShaderGraphExporter. Each entry matches a ShaderGraph by source name (e.g. 'Vegetation') or by its snake-cased file stem (e.g. 'vegetation'); matching is case-insensitive. Only Lit graphs produce a grass variant.",
+  "shaders": [
+    "Vegetation"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "HZExporter.MagicaCloth2",
+  "rootNamespace": "HZExporter",
+  "references": [
+    "HZExporter.Editor",
+    "MagicaClothV2"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": ["MAGICACLOTH2"],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

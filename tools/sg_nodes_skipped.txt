@@ -1,0 +1,43 @@
+# 41 nodes need manual handlers
+
+BlackbodyNode: multi-statement body or non-assignment shape
+BlendNode: multi-statement body or non-assignment shape
+CheckerboardNode: multi-statement body or non-assignment shape
+ColorMaskNode: multi-statement body or non-assignment shape
+CombineNode: multi-output (3 outs) — needs custom handler
+ContrastNode: multi-statement body or non-assignment shape
+DDXNode: no Unity_* method
+DDXYNode: no Unity_* method
+DDYNode: no Unity_* method
+DitherNode: multi-statement body or non-assignment shape
+EllipseNode: multi-statement body or non-assignment shape
+EyeIndexNode: no Unity_* method
+FogNode: multi-output (2 outs) — needs custom handler
+HueNode: multi-statement body or non-assignment shape
+MainLightDirectionNode: no Unity_* method
+NoiseSineWaveNode: no Unity_* method
+NormalBlendNode: unsupported HLSL intrinsic 'SafeNormalize'
+NormalReconstructZNode: no Unity_* method
+NormalStrengthNode: preprocessor / Unity macro / $ token in body
+NormalUnpackNode: unsupported HLSL intrinsic 'UnpackNormal'
+PolarCoordinatesNode: multi-statement body or non-assignment shape
+PolygonNode: multi-statement body or non-assignment shape
+RadialShearNode: multi-statement body or non-assignment shape
+RandomRangeNode: multi-statement body or non-assignment shape
+RectangleNode: multi-statement body or non-assignment shape
+ReplaceColorNode: multi-statement body or non-assignment shape
+RotateAboutAxisNode: multi-statement body or non-assignment shape
+RotateNode: multi-statement body or non-assignment shape
+RoundedPolygonNode: no Unity_* method
+RoundedRectangleNode: multi-statement body or non-assignment shape
+SaturationNode: multi-statement body or non-assignment shape
+SawtoothWaveNode: no Unity_* method
+SceneDepthDifferenceNode: multi-statement body or non-assignment shape
+SphereMaskNode: no Unity_* method
+SpherizeNode: multi-statement body or non-assignment shape
+SplitTextureTransformNode: multi-output (3 outs) — needs custom handler
+SquareWaveNode: no Unity_* method
+TriangleWaveNode: no Unity_* method
+TwirlNode: multi-statement body or non-assignment shape
+ViewVectorNode: multi-statement body or non-assignment shape
+WhiteBalanceNode: multi-statement body or non-assignment shape
