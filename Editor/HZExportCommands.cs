@@ -86,7 +86,7 @@ public static class HZExportCommands
     /// folders into a .hz.glsl file under ExportedAssets/shaders/. Skips
     /// folders that don't exist so the project can drop in/out of shader
     /// packs without breaking the menu.</summary>
-    [MenuItem("HZ Engine/Export Shader Graphs")]
+    [MenuItem("Hz Exporter/Export Shader Graphs")]
     public static void ExportShaderGraphs()
     {
         string outDir = OutputDir + "/shaders";
@@ -177,7 +177,6 @@ public static class HZExportCommands
 
     /// <summary>Export the active scene's skybox to an equirect Radiance .hdr.
     /// Engine cooks .hdr → cubemap KTX + HdrEnvironmentBlobAsset on its side.</summary>
-    [MenuItem("HZ Engine/Export Skybox")]
     public static void ExportSkybox()
     {
         string sceneName = SceneManager.GetActiveScene().name;
@@ -186,7 +185,6 @@ public static class HZExportCommands
         HZSkyboxExporter.Export(outPath);
     }
 
-    [MenuItem("HZ Engine/Export Test Cube")]
     public static void ExportTestCube()
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -480,7 +478,6 @@ public static class HZExportCommands
     /// files that aren't loaded by a plain OpenScene — we resolve each SubScene's
     /// SceneAsset and open it additively.
     /// </summary>
-    [MenuItem("HZ Engine/Open Boids Scene")]
     public static void OpenBoidsScene()
     {
         OpenSceneWithSubScenes("Assets/Boids/Boids.unity");
@@ -529,7 +526,6 @@ public static class HZExportCommands
     /// <summary>Lay out every renderer-bearing root GameObject in the active scene on a square
     /// grid, sized to the largest object's footprint so nothing overlaps. Each object is centered
     /// in its cell (by its combined renderer bounds) and dropped so its base sits on y=0.</summary>
-    [MenuItem("HZ Engine/Layout Scene Grid")]
     public static void LayoutSceneGrid()
     {
         var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
@@ -716,7 +712,6 @@ public static class HZExportCommands
     /// then export. (Plain "Export Active Scene" only walks already-loaded scenes, so
     /// for a subscene-based scene you must have the SubScenes open first.)
     /// </summary>
-    [MenuItem("HZ Engine/Export Boids Scene")]
     public static void ExportBoids()
     {
         OpenBoidsScene();
@@ -869,7 +864,7 @@ public static class HZExportCommands
         return roots.ToArray();
     }
 
-    [MenuItem("HZ Engine/Export Active Scene")]
+    [MenuItem("Hz Exporter/Export Active Scene")]
     public static void ExportScene()
     {
         // Clear the per-export PNG cache so we don't leak texture bytes across runs.
