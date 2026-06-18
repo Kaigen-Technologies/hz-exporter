@@ -71,44 +71,24 @@ public static class HZExportCommands
     }
 
     // Folders the "Export Shader Graphs" menu walks. Add more here as new
-    // production shaders show up; tests under Assets/ShaderGraphExport/ keep
-    // working alongside them. Per-shader exec entry points (ExportSurfaceShader
-    // etc.) are still exposed below for the CLI flow.
-    static readonly string[] ShaderGraphSourceDirs = new[]
-    {
-        "Assets/ShaderGraphExport",
-        "Assets/Idyllic Fantasy Nature/Shader",
-        "Assets/yyyrjis/ModularAnimeCharacter1/Shaders",
-        "Assets/Boids/SampleAssets/Shaders",
-    };
-
-    /// <summary>Translate every .shadergraph under the configured source
-    /// folders into a .hz.glsl file under ExportedAssets/shaders/. Skips
-    /// folders that don't exist so the project can drop in/out of shader
-    /// packs without breaking the menu.</summary>
+    /// <summary>Translate every .shadergraph referenced in shader_mapping.json into a
+    /// .hz.glsl file under ExportedAssets/shaders/. Resolves paths via Shader.Find so
+    /// there are no hardcoded folder paths.</summary>
     [MenuItem("Hz Exporter/Export Shader Graphs")]
     public static void ExportShaderGraphs()
     {
         string outDir = OutputDir + "/shaders";
-        int ok = 0, fail = 0, skipped = 0;
-        var files = new System.Collections.Generic.List<string>();
-        foreach (var dir in ShaderGraphSourceDirs)
+        int ok = 0, fail = 0;
+        foreach (var shaderName in HZShaderMap.MappedShaderNames())
         {
-            if (!System.IO.Directory.Exists(dir))
-            {
-                Debug.Log($"[HZ-SG] skipping (not present): {dir}");
-                skipped++;
-                continue;
-            }
-            files.AddRange(System.IO.Directory.GetFiles(dir, "*.shadergraph", System.IO.SearchOption.TopDirectoryOnly));
+            var shader = Shader.Find(shaderName);
+            if (shader == null) continue;
+            var path = AssetDatabase.GetAssetPath(shader);
+            if (!path.EndsWith(".shadergraph", System.StringComparison.OrdinalIgnoreCase)) continue;
+            try { HZShaderGraphExporter.ExportFile(path, outDir); ok++; }
+            catch (System.Exception e) { Debug.LogError($"[HZ-SG] {System.IO.Path.GetFileName(path)}: {e.Message}\n{e.StackTrace}"); fail++; }
         }
-        files.Sort();
-        foreach (var f in files)
-        {
-            try { HZShaderGraphExporter.ExportFile(f, outDir); ok++; }
-            catch (System.Exception e) { Debug.LogError($"[HZ-SG] {System.IO.Path.GetFileName(f)}: {e.Message}\n{e.StackTrace}"); fail++; }
-        }
-        Debug.Log($"[HZ-SG] done — {ok} ok, {fail} failed, {skipped} folder(s) skipped");
+        Debug.Log($"[HZ-SG] done — {ok} ok, {fail} failed");
     }
 
     /// <summary>Test-export a cube with a default URP/Lit material through the grass path,
@@ -1466,6 +1446,8 @@ public static class HZExportCommands
 
         HZSceneExporter.Export(entities.ToArray(), scenePath, sceneDir, sceneDirAssetPath);
         Debug.Log($"[HZ] Scene export done! {entities.Count} entities, {exportedGlbs.Count} unique GLBs");
+
+        ExportShaderGraphs();
     }
 
     struct DeferredSkinnedExport

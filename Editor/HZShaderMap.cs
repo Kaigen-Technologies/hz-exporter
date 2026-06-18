@@ -161,6 +161,9 @@ namespace HZExporter
         /// <summary>Force a reload on the next lookup.</summary>
         public static void Reload() { s_byShader = null; s_customFunctions = null; s_default = null; s_mtime = System.DateTime.MinValue; }
 
+        /// <summary>All Unity shader names present in shader_mapping.json.</summary>
+        public static IEnumerable<string> MappedShaderNames() { EnsureLoaded(); return s_byShader.Keys; }
+
         /// <summary>Lookup the mapping entry for a material's shader, falling back to the default.</summary>
         public static ShaderEntry Lookup(Material mat)
         {
