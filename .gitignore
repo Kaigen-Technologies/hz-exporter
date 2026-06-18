@@ -16,3 +16,5 @@ tools/*.pyc
 *.csproj
 *.sln
 *.slnx
+tools/__pycache__/
+*.pyc
