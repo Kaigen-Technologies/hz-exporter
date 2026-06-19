@@ -892,10 +892,12 @@ public static class HZExportCommands
         var roots = GetAllLoadedRoots();
         var entities = new List<HZSceneExporter.EntityExportInfo>();
 
-        // Nuke the scene output dir up front: the terrain export (runs inside the
-        // entity loop) and the chunk/manifest writers both write here, so the
-        // clean-slate must happen once before either touches it.
-        string sceneOutDir = $"{OutputDir}/scenes/{SanitizeName(scene.name)}";
+        // Nuke the scene's chunk dir up front: the terrain export (runs inside the
+        // entity loop) and the chunk writer both write here, so the clean-slate must
+        // happen once before either touches it. Layout mirrors the engine asset paths
+        // exactly: chunk/terrain/cloth live at <out>/<scene>/ (asset path unity/<scene>/),
+        // the manifest at <out>/scenes/<scene>.hzt (asset path unity/scenes/<scene>.hzt).
+        string sceneOutDir = $"{OutputDir}/{SanitizeName(scene.name)}";
         if (System.IO.Directory.Exists(sceneOutDir))
             System.IO.Directory.Delete(sceneOutDir, true);
         System.IO.Directory.CreateDirectory(sceneOutDir);
@@ -1233,7 +1235,7 @@ public static class HZExportCommands
                     {
                         // MeshCloth authoring → per-character cloth blobs + EcsClothRefs.
                         string clothSceneNm = SanitizeName(scene.name);
-                        string clothOutDir = $"{OutputDir}/scenes/{clothSceneNm}/cloth";
+                        string clothOutDir = $"{OutputDir}/{clothSceneNm}/cloth";
                         string clothAssetPrefix = $"{AssetPrefix}/{clothSceneNm}/cloth";
                         var clothFiles = HZClothIntegration.ExportMeshCloths(go, validSmrs.ToArray(), clothOutDir);
                         const int ECS_CLOTH_MAX_PER_MODEL = 24;
@@ -1268,11 +1270,9 @@ public static class HZExportCommands
                     {
                         string sceneNm = SanitizeName(scene.name);
                         string terrainNm = SanitizeName(td.name);
-                        // outDir is the ExportedAssets/scenes/ filesystem layout; assetPrefix
-                        // is the engine asset-path convention (no "scenes/" segment — matches
-                        // sceneDirAssetPath = "unity/<scene>"). cp -r drops scenes/Demo into
-                        // assets/unity/Demo, so the two must agree on "unity/<scene>/terrain/...".
-                        string outDir = $"{OutputDir}/scenes/{sceneNm}/terrain/{terrainNm}";
+                        // Filesystem layout mirrors the engine asset path exactly:
+                        // <out>/<scene>/terrain/... ↔ unity/<scene>/terrain/...
+                        string outDir = $"{OutputDir}/{sceneNm}/terrain/{terrainNm}";
                         string assetPrefix = $"{AssetPrefix}/{sceneNm}/terrain/{terrainNm}";
                         // Grass models flow through the same GLB dedup as scene meshes; grass
                         // albedo textures go to the shared glb/textures tree (deduped).
@@ -1479,7 +1479,7 @@ public static class HZExportCommands
             });
         }
         string scenePath = $"{OutputDir}/scenes/{sceneName}.hzt";
-        string sceneDir = $"{OutputDir}/scenes/{sceneName}";
+        string sceneDir = $"{OutputDir}/{sceneName}";
         string sceneDirAssetPath = $"{AssetPrefix}/{sceneName}";
 
         HZSceneExporter.Export(entities.ToArray(), scenePath, sceneDir, sceneDirAssetPath);
