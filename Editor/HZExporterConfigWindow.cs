@@ -52,21 +52,6 @@ namespace HZExporter
                 _config.autoCopyOnExport);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Tools", EditorStyles.boldLabel);
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                _config.pvrTexToolPath = EditorGUILayout.TextField(
-                    new GUIContent("PVRTexTool Path", "Override for the PVRTexToolCLI binary. Empty = env var / platform defaults."),
-                    _config.pvrTexToolPath);
-                if (GUILayout.Button("Browse…", GUILayout.Width(70)))
-                {
-                    string picked = EditorUtility.OpenFilePanel("Select PVRTexToolCLI", _config.pvrTexToolPath, "");
-                    if (!string.IsNullOrEmpty(picked)) _config.pvrTexToolPath = picked;
-                }
-            }
-
-            EditorGUILayout.Space();
 
             string dest = _config.ResolvedEngineDir();
             EditorGUILayout.HelpBox(

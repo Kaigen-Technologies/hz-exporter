@@ -5,7 +5,8 @@ using UnityEngine;
 namespace HZExporter
 {
     /// <summary>
-    /// Exports a Unity Texture2D as a TextureBlobAsset (.hzt text or .hza binary) + compressed KTX.
+    /// Exports a Unity Texture2D as a TextureBlobAsset (.hzt text or .hza binary) + PNG.
+    /// Texture compression (KTX) is done by the engine, not here.
     /// </summary>
     public static class HZTextureExporter
     {
@@ -17,40 +18,8 @@ namespace HZExporter
         const uint TEX_FORMAT_BC3 = 2;
         const uint TEX_FORMAT_BC5 = 3;
 
-        static readonly string PVRTEXTOOL_PATH = FindPVRTexTool();
-
-        static string FindPVRTexTool()
-        {
-            // Config override wins, then environment variable.
-            string cfgPath = HZExporterConfig.Instance.pvrTexToolPath;
-            if (!string.IsNullOrEmpty(cfgPath) && File.Exists(cfgPath)) return cfgPath;
-
-            string envPath = System.Environment.GetEnvironmentVariable("PVRTEXTOOL_PATH");
-            if (!string.IsNullOrEmpty(envPath) && File.Exists(envPath)) return envPath;
-
-            // Platform-specific default paths
-            string[] candidates;
-            if (Application.platform == RuntimePlatform.OSXEditor)
-            {
-                candidates = new[] {
-                    Path.GetFullPath("../hz-engine-v5/tools/PVRTextTool/PVRTexToolCLI"),
-                    "/usr/local/bin/PVRTexToolCLI",
-                };
-            }
-            else
-            {
-                candidates = new[] {
-                    "D:/dev/gabrieldechichi/hz-engine-v5/tools/PVRTextTool/PVRTexToolCLI.exe",
-                    Path.GetFullPath("../hz-engine-v5/tools/PVRTextTool/PVRTexToolCLI.exe"),
-                };
-            }
-            foreach (var c in candidates)
-                if (File.Exists(c)) return c;
-            return candidates[0]; // fallback — will fail at runtime with a clear error
-        }
-
         /// <summary>
-        /// Export a texture as TextureBlobAsset (.hza) + PNG + compressed KTX.
+        /// Export a texture as TextureBlobAsset (.hza) + PNG.
         /// </summary>
         /// <param name="texture">Source texture</param>
         /// <param name="imageBasePath">Asset-relative base path for the image (e.g. "/unity/albedo") — no extension</param>
@@ -69,23 +38,7 @@ namespace HZExporter
             if (readable != texture)
                 Object.DestroyImmediate(readable);
 
-            // Compress with PVRTexTool
-            string outputBase = Path.Combine(
-                Path.GetDirectoryName(outputPngPath),
-                Path.GetFileNameWithoutExtension(outputPngPath));
-            string colorSpace = isSrgb ? "sRGB" : "lRGB";
-
-            uint format;
-            if (hasAlpha)
-            {
-                format = TEX_FORMAT_BC3;
-                RunPVRTexTool($"-i \"{outputPngPath}\" -o \"{outputBase}_bc3.ktx\" -m -f BC3,UBN,{colorSpace}");
-            }
-            else
-            {
-                format = TEX_FORMAT_BC1;
-                RunPVRTexTool($"-i \"{outputPngPath}\" -o \"{outputBase}_bc1.ktx\" -m -f BC1,UBN,{colorSpace}");
-            }
+            uint format = hasAlpha ? TEX_FORMAT_BC3 : TEX_FORMAT_BC1;
 
             // Write TextureBlobAsset
             var w = new HZBlobWriter(1024);
@@ -115,7 +68,7 @@ namespace HZExporter
             Debug.Log($"[HZTextureExporter] Exported → {outputHzaPath} ({finalSize} bytes, format={(format == TEX_FORMAT_BC1 ? "BC1" : "BC3")}, srgb={isSrgb})");
         }
 
-        /// <summary>Export as .hzt text file + PNG + compressed KTX.</summary>
+        /// <summary>Export as .hzt text file + PNG.</summary>
         public static void ExportHzt(Texture2D texture, string imageBasePath, bool isSrgb,
             bool hasAlpha, string outputHztPath, string outputPngPath)
         {
@@ -127,23 +80,7 @@ namespace HZExporter
             if (readable != texture)
                 Object.DestroyImmediate(readable);
 
-            // Compress with PVRTexTool
-            string outputBase = Path.Combine(
-                Path.GetDirectoryName(outputPngPath),
-                Path.GetFileNameWithoutExtension(outputPngPath));
-            string colorSpace = isSrgb ? "sRGB" : "lRGB";
-
-            string formatName;
-            if (hasAlpha)
-            {
-                formatName = "TEX_FORMAT_BC3";
-                RunPVRTexTool($"-i \"{outputPngPath}\" -o \"{outputBase}_bc3.ktx\" -m -f BC3,UBN,{colorSpace}");
-            }
-            else
-            {
-                formatName = "TEX_FORMAT_BC1";
-                RunPVRTexTool($"-i \"{outputPngPath}\" -o \"{outputBase}_bc1.ktx\" -m -f BC1,UBN,{colorSpace}");
-            }
+            string formatName = hasAlpha ? "TEX_FORMAT_BC3" : "TEX_FORMAT_BC1";
 
             // Write .hzt
             var sb = new StringBuilder();
@@ -161,31 +98,6 @@ namespace HZExporter
             Directory.CreateDirectory(Path.GetDirectoryName(outputHztPath));
             File.WriteAllText(outputHztPath, sb.ToString());
             Debug.Log($"[HZTextureExporter] Exported → {outputHztPath} (format={formatName}, srgb={isSrgb})");
-        }
-
-        static void RunPVRTexTool(string args)
-        {
-            if (!File.Exists(PVRTEXTOOL_PATH))
-            {
-                Debug.LogWarning($"[HZTextureExporter] PVRTexTool not found at '{PVRTEXTOOL_PATH}', skipping KTX compression");
-                return;
-            }
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = PVRTEXTOOL_PATH,
-                Arguments = args,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            };
-            var proc = System.Diagnostics.Process.Start(psi);
-            proc.WaitForExit(30000);
-            if (proc.ExitCode != 0)
-            {
-                string stderr = proc.StandardError.ReadToEnd();
-                Debug.LogError($"[HZTextureExporter] PVRTexTool failed (exit {proc.ExitCode}): {stderr}");
-            }
         }
 
         static Texture2D MakeReadable(Texture2D src)

@@ -23,9 +23,6 @@ namespace HZExporter
         // When true, ExportScene copies the staging dir into the engine project after export.
         public bool autoCopyOnExport = false;
 
-        // Override for the PVRTexTool CLI binary. Empty = use env var / platform defaults.
-        public string pvrTexToolPath = "";
-
         // ---- Persistence ----
         const string ConfigPath = "UserSettings/HzExporter.json";
 
