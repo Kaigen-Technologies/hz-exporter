@@ -21,7 +21,10 @@ namespace HZExporter
 
         static string FindPVRTexTool()
         {
-            // Check environment variable first
+            // Config override wins, then environment variable.
+            string cfgPath = HZExporterConfig.Instance.pvrTexToolPath;
+            if (!string.IsNullOrEmpty(cfgPath) && File.Exists(cfgPath)) return cfgPath;
+
             string envPath = System.Environment.GetEnvironmentVariable("PVRTEXTOOL_PATH");
             if (!string.IsNullOrEmpty(envPath) && File.Exists(envPath)) return envPath;
 

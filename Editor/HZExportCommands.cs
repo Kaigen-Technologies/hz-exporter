@@ -15,10 +15,48 @@ using HZExporter;
 /// </summary>
 public static class HZExportCommands
 {
-    static readonly string OutputDir = System.IO.Path.GetFullPath("ExportedAssets");
+    // Local staging dir, resolved from config (default ExportedAssets/ under project root).
+    static string OutputDir => HZExporter.HZExporterConfig.Instance.ResolvedOutputDir();
 
     // Asset-relative prefix (how the engine sees the paths, relative to assets/)
     const string AssetPrefix = "unity";
+
+    /// <summary>Copy the local staging dir into the configured engine project
+    /// (merge/overwrite). No-op with a warning when no engine path is set.</summary>
+    [MenuItem("Hz Exporter/Copy to Engine")]
+    public static void CopyToEngine()
+    {
+        var cfg = HZExporter.HZExporterConfig.Instance;
+        string dest = cfg.ResolvedEngineDir();
+        if (string.IsNullOrEmpty(dest))
+        {
+            Debug.LogWarning("[HZ] No engine project path configured (Hz Exporter/Configure); skipping copy.");
+            return;
+        }
+        string src = OutputDir;
+        if (!System.IO.Directory.Exists(src))
+        {
+            Debug.LogWarning($"[HZ] Nothing to copy — staging dir not found: {src}");
+            return;
+        }
+        int files = CopyDirMerge(src, dest);
+        Debug.Log($"[HZ] Copied {files} file(s) to engine: {dest}");
+    }
+
+    // Recursively copy src → dst, overwriting existing files, leaving other dst files intact.
+    static int CopyDirMerge(string src, string dst)
+    {
+        System.IO.Directory.CreateDirectory(dst);
+        int count = 0;
+        foreach (var file in System.IO.Directory.GetFiles(src))
+        {
+            System.IO.File.Copy(file, System.IO.Path.Combine(dst, System.IO.Path.GetFileName(file)), true);
+            count++;
+        }
+        foreach (var dir in System.IO.Directory.GetDirectories(src))
+            count += CopyDirMerge(dir, System.IO.Path.Combine(dst, System.IO.Path.GetFileName(dir)));
+        return count;
+    }
 
     /// <summary>Translate the BasicShader real-world test graph
     /// (Assets/yyyrjis/ModularAnimeCharacter1/Shaders/BasicShader.shadergraph).</summary>
@@ -1448,6 +1486,9 @@ public static class HZExportCommands
         Debug.Log($"[HZ] Scene export done! {entities.Count} entities, {exportedGlbs.Count} unique GLBs");
 
         ExportShaderGraphs();
+
+        if (HZExporter.HZExporterConfig.Instance.autoCopyOnExport)
+            CopyToEngine();
     }
 
     struct DeferredSkinnedExport
