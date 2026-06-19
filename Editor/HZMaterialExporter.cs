@@ -163,7 +163,7 @@ namespace HZExporter
 
             var sb = new StringBuilder();
             sb.AppendLine("type MaterialBlobAsset");
-            sb.AppendLine("version 3");
+            sb.AppendLine($"version {HZBlobWriter.ASSET_VERSION}");
             sb.AppendLine("---");
             sb.AppendLine($"shader_source \"{shaderPath}\" ShaderBlobAsset");
             sb.AppendLine("depth_test true");
@@ -244,7 +244,7 @@ namespace HZExporter
 
             var sb = new StringBuilder();
             sb.AppendLine("type MaterialBlobAsset");
-            sb.AppendLine("version 3");
+            sb.AppendLine($"version {HZBlobWriter.ASSET_VERSION}");
             sb.AppendLine("---");
             sb.AppendLine($"shader_source \"{shaderPath}\" ShaderBlobAsset");
             sb.AppendLine("depth_test true");

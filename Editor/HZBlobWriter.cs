@@ -99,7 +99,7 @@ namespace HZExporter
         // --- BlobAssetHeader (48 bytes) ---
 
         public const ulong ASSET_MAGIC = 0x54455353414800UL;
-        public const uint ASSET_VERSION = 3;
+        public const uint ASSET_VERSION = 8;
 
         /// <summary>
         /// Writes a BlobAssetHeader. Returns the position where it starts.

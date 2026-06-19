@@ -85,7 +85,7 @@ namespace HZExporter
             // Write .hzt
             var sb = new StringBuilder();
             sb.AppendLine("type TextureBlobAsset");
-            sb.AppendLine("version 3");
+            sb.AppendLine($"version {HZBlobWriter.ASSET_VERSION}");
             sb.AppendLine("---");
             sb.AppendLine($"image \"{imageBasePath}\" u8");
             sb.AppendLine($"format {formatName}");

@@ -50,8 +50,8 @@ namespace HZExporter
         // Camera: 4x mat4(256) + Frustum(96) + quat(16) + vec3(12) + 4x f32(16) = 396
         const int SIZE_Camera = 396;
         const int SIZE_EcsSceneSettings = 40;    // ColorF32(16) + f32(4) + ColorF32(16) + f32 max_shadow_distance(4)
-        const int SIZE_EcsDirectionalLight = 32; // v3 color(12) + f32 intensity(4) + b32 cast_shadow(4) + 3*f32 shadow_strength/bias/normal_bias(12)
-        const int SIZE_EcsPointLight = 20;       // v3 color(12) + f32 radius(4) + f32 intensity(4)
+        const int SIZE_EcsDirectionalLight = 36; // ColorF32 color(16) + f32 intensity(4) + b32 cast_shadow(4) + 3*f32 shadow_strength/bias/normal_bias(12)
+        const int SIZE_EcsPointLight = 24;       // ColorF32 color(16) + f32 radius(4) + f32 intensity(4)
         const int SIZE_EcsAnimationRef = 24;     // BlobAssetRef(AnimationBlobAsset)
         const int SIZE_EcsParent = 8;            // EcsEntity (u64)
         const int SIZEOF_ANIMATION_BLOB_ASSET = 72;
@@ -222,7 +222,7 @@ namespace HZExporter
         {
             var sb = new StringBuilder();
             sb.AppendLine("type SceneBlobAsset");
-            sb.AppendLine("version 3");
+            sb.AppendLine($"version {HZBlobWriter.ASSET_VERSION}");
             sb.AppendLine("---");
             sb.AppendLine($"scene_dir \"{sceneDirAssetPath}\"");
             sb.AppendLine("chunks 1");
@@ -239,7 +239,7 @@ namespace HZExporter
         {
             var sb = new StringBuilder();
             sb.AppendLine("type EntityChunkBlobAsset");
-            sb.AppendLine("version 3");
+            sb.AppendLine($"version {HZBlobWriter.ASSET_VERSION}");
             sb.AppendLine("---");
 
             for (int i = 0; i < entities.Length; i++)
@@ -453,9 +453,10 @@ namespace HZExporter
                 sb.AppendLine();
                 sb.AppendLine("component EcsDirectionalLight");
                 sb.AppendLine("  color");
-                sb.AppendLine($"    x {F(info.lightColor.x)}");
-                sb.AppendLine($"    y {F(info.lightColor.y)}");
-                sb.AppendLine($"    z {F(info.lightColor.z)}");
+                sb.AppendLine($"    r {F(info.lightColor.x)}");
+                sb.AppendLine($"    g {F(info.lightColor.y)}");
+                sb.AppendLine($"    b {F(info.lightColor.z)}");
+                sb.AppendLine($"    a 1.000000");
                 sb.AppendLine($"  intensity {F(info.lightIntensity)}");
                 sb.AppendLine($"  cast_shadow {(info.castShadow ? "true" : "false")}");
                 sb.AppendLine($"  shadow_strength {F(info.shadowStrength)}");
@@ -469,9 +470,10 @@ namespace HZExporter
                 sb.AppendLine();
                 sb.AppendLine("component EcsPointLight");
                 sb.AppendLine("  color");
-                sb.AppendLine($"    x {F(info.lightColor.x)}");
-                sb.AppendLine($"    y {F(info.lightColor.y)}");
-                sb.AppendLine($"    z {F(info.lightColor.z)}");
+                sb.AppendLine($"    r {F(info.lightColor.x)}");
+                sb.AppendLine($"    g {F(info.lightColor.y)}");
+                sb.AppendLine($"    b {F(info.lightColor.z)}");
+                sb.AppendLine($"    a 1.000000");
                 sb.AppendLine($"  radius {F(info.pointLightRadius)}");
                 sb.AppendLine($"  intensity {F(info.lightIntensity)}");
             }
@@ -754,6 +756,7 @@ namespace HZExporter
             {
                 ReserveComponent(HASH_EcsDirectionalLight, SIZE_EcsDirectionalLight, wr => {
                     wr.WriteVec3(info.lightColor.x, info.lightColor.y, info.lightColor.z);
+                    wr.WriteF32(1f); // color.a
                     wr.WriteF32(info.lightIntensity);
                     wr.WriteU32(info.castShadow ? 1u : 0u);
                     wr.WriteF32(info.shadowStrength);
@@ -767,6 +770,7 @@ namespace HZExporter
             {
                 ReserveComponent(HASH_EcsPointLight, SIZE_EcsPointLight, wr => {
                     wr.WriteVec3(info.lightColor.x, info.lightColor.y, info.lightColor.z);
+                    wr.WriteF32(1f); // color.a
                     wr.WriteF32(info.pointLightRadius);
                     wr.WriteF32(info.lightIntensity);
                 });

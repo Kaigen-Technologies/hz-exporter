@@ -677,7 +677,7 @@ namespace HZExporter
         {
             var sb = new StringBuilder();
             sb.AppendLine("type TextureBlobAsset");
-            sb.AppendLine("version 3");
+            sb.AppendLine($"version {HZBlobWriter.ASSET_VERSION}");
             sb.AppendLine("---");
             sb.AppendLine($"image \"{imagePath}\" u8");
             sb.AppendLine($"format {format}");
@@ -696,7 +696,7 @@ namespace HZExporter
             var size = td.size;
             var sb = new StringBuilder();
             sb.AppendLine("type TerrainBlobAsset");
-            sb.AppendLine("version 3");
+            sb.AppendLine($"version {HZBlobWriter.ASSET_VERSION}");
             sb.AppendLine("---");
             sb.AppendLine($"heightmap \"{assetPrefix}/heightmap.hzt\" TextureBlobAsset");
             sb.AppendLine($"world_width {F(size.x)}");
