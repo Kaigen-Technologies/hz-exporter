@@ -43,6 +43,18 @@ public static class HZExportCommands
         Debug.Log($"[HZ] Copied {files} file(s) to engine: {dest}");
     }
 
+    [MenuItem("Hz Exporter/Play Engine")]
+    public static void PlayEngine() => HZExporter.HZEnginePlayer.Play();
+
+    [MenuItem("Hz Exporter/Play Engine", true)]
+    static bool PlayEngineValidate() => !HZExporter.HZEnginePlayer.IsRunning;
+
+    [MenuItem("Hz Exporter/Stop Engine")]
+    public static void StopEngine() => HZExporter.HZEnginePlayer.Stop();
+
+    [MenuItem("Hz Exporter/Stop Engine", true)]
+    static bool StopEngineValidate() => HZExporter.HZEnginePlayer.IsRunning;
+
     // Recursively copy src → dst, overwriting existing files, leaving other dst files intact.
     static int CopyDirMerge(string src, string dst)
     {

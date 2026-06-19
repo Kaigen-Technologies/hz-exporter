@@ -15,12 +15,6 @@ namespace HZExporter
             window.minSize = new Vector2(460, 240);
         }
 
-        void OnEnable()
-        {
-            // Work on a copy so edits only persist on Save.
-            _config = JsonUtility.FromJson<HZExporterConfig>(JsonUtility.ToJson(HZExporterConfig.Instance));
-        }
-
         void OnGUI()
         {
             EditorGUILayout.LabelField("Export", EditorStyles.boldLabel);
@@ -77,6 +71,39 @@ namespace HZExporter
                     }
                 }
             }
+
+            EditorGUILayout.Space();
+            using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(_config.engineProjectPath)))
+            {
+                if (HZEnginePlayer.IsRunning)
+                {
+                    GUI.backgroundColor = new Color(0.9f, 0.5f, 0.5f);
+                    if (GUILayout.Button("■ Stop Engine", GUILayout.Height(32)))
+                        HZEnginePlayer.Stop();
+                }
+                else
+                {
+                    GUI.backgroundColor = new Color(0.5f, 0.9f, 0.5f);
+                    if (GUILayout.Button("▶ Play Engine", GUILayout.Height(32)))
+                    {
+                        _config.Save();
+                        HZEnginePlayer.Play();
+                    }
+                }
+                GUI.backgroundColor = Color.white;
+            }
+        }
+
+        void OnEnable()
+        {
+            // Reload working copy and keep the Play/Stop button state fresh.
+            _config = JsonUtility.FromJson<HZExporterConfig>(JsonUtility.ToJson(HZExporterConfig.Instance));
+            EditorApplication.update += Repaint;
+        }
+
+        void OnDisable()
+        {
+            EditorApplication.update -= Repaint;
         }
     }
 }
