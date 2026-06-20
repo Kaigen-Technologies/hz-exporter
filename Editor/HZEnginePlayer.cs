@@ -167,26 +167,10 @@ namespace HZExporter
 
         static bool TryGetLaunchCommand(string root, out string exe, out string args)
         {
-            exe = null;
-            args = null;
-            switch (Application.platform)
-            {
-                case RuntimePlatform.OSXEditor:
-                    exe = Path.Combine(root, "hzbuild");
-                    args = "macos run";
-                    break;
-                case RuntimePlatform.LinuxEditor:
-                    exe = Path.Combine(root, "hzbuild");
-                    args = "linux run";
-                    break;
-                case RuntimePlatform.WindowsEditor:
-                    exe = Path.Combine(root, "hzbuild.exe");
-                    if (!File.Exists(exe)) exe = Path.Combine(root, "hzbuild");
-                    args = "windows run";
-                    break;
-                default:
-                    return false;
-            }
+            args = "run";
+            exe = Path.Combine(root, Application.platform == RuntimePlatform.WindowsEditor
+                ? "hzbuild.exe" : "hzbuild");
+            if (!File.Exists(exe)) exe = Path.Combine(root, "hzbuild");
             return File.Exists(exe);
         }
     }
