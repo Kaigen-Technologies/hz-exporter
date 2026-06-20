@@ -257,6 +257,7 @@ namespace HZExporter
             var imageEntries = new List<(int off, int size, string name, int matIdx, int role)>();
             var matFactors = new HZShaderMap.Factors[materials.Length];
             var customMats = new HZShaderMap.CustomMaterial[materials.Length];
+            var mtoonExtras = new HZShaderMap.MToonExtras[materials.Length];
             // Unity multi-pass: when the renderer carries more materials than the mesh
             // has sub-meshes, the extra (opposite-cull) pass over the last sub-mesh is the
             // two-sided idiom. Collapse it to a double-sided primitive (see ExportSkinnedMesh).
@@ -313,6 +314,14 @@ namespace HZExporter
                     {
                         imageEntries.Add((img.off, img.size, img.name, capturedMi, img.role));
                     });
+                    if (HZShaderMap.IsMToon(materials[mi]))
+                    {
+                        mtoonExtras[mi] = HZShaderMap.EmbedMToon(materials[mi], bin, img =>
+                        {
+                            imageEntries.Add((img.off, img.size, img.name, capturedMi, img.role));
+                        });
+                        if (mtoonExtras[mi].doubleSided) matDoubleSided[mi] = true;
+                    }
                 }
             }
 
@@ -375,6 +384,7 @@ namespace HZExporter
             var json = new StringBuilder();
             json.Append("{\n");
             json.Append("  \"asset\": { \"version\": \"2.0\", \"generator\": \"HZExporter\" },\n");
+            foreach (var mx in mtoonExtras) if (mx != null) { json.Append("  \"extensionsUsed\": [\"VRMC_materials_mtoon\"],\n"); break; }
 
             json.Append($"  \"buffers\": [{{ \"byteLength\": {binData.Length} }}],\n");
 
@@ -458,14 +468,14 @@ namespace HZExporter
                 json.Append("\n  ],\n");
             }
 
-            // Per-material texture index map: [matIdx] → [albedo, normal, orm, emissive]
+            // Per-material texture index map: [matIdx] → [albedo, normal, orm, emissive, shade, matcap, rim]
             var matTexMap = new Dictionary<int, int[]>();
             for (int ii = 0; ii < imageEntries.Count; ii++)
             {
                 int mi = imageEntries[ii].matIdx;
-                if (!matTexMap.ContainsKey(mi)) matTexMap[mi] = new int[] { -1, -1, -1, -1 };
+                if (!matTexMap.ContainsKey(mi)) matTexMap[mi] = new int[] { -1, -1, -1, -1, -1, -1, -1 };
                 int role = imageEntries[ii].role;
-                if (role >= 0 && role < 4) matTexMap[mi][role] = ii;
+                if (role >= 0 && role < 7) matTexMap[mi][role] = ii;
             }
 
             // Materials — factors + slotted texture refs (from HZShaderMap).
@@ -485,7 +495,7 @@ namespace HZExporter
                 else
                 {
                     var f = matFactors[mi];
-                    int[] ti = matTexMap.ContainsKey(mi) ? matTexMap[mi] : new int[] { -1, -1, -1, -1 };
+                    int[] ti = matTexMap.ContainsKey(mi) ? matTexMap[mi] : new int[] { -1, -1, -1, -1, -1, -1, -1 };
                     json.Append($"    {{\n      \"name\": \"{EscapeJson(matName)}\",\n      \"pbrMetallicRoughness\": {{\n");
                     json.Append($"        \"baseColorFactor\": [{F(f.baseColor.r)}, {F(f.baseColor.g)}, {F(f.baseColor.b)}, {F(f.baseColor.a)}]");
                     if (ti[0] >= 0) json.Append($",\n        \"baseColorTexture\": {{ \"index\": {ti[0]} }}");
@@ -499,6 +509,7 @@ namespace HZExporter
                         json.Append($",\n      \"emissiveFactor\": [{F(f.emissive.r)}, {F(f.emissive.g)}, {F(f.emissive.b)}]");
                     if (ti[3] >= 0) json.Append($",\n      \"emissiveTexture\": {{ \"index\": {ti[3]} }}");
                     if (matDoubleSided[mi]) json.Append(",\n      \"doubleSided\": true");
+                    if (mtoonExtras[mi] != null) AppendMToonExtension(json, mtoonExtras[mi], ti);
                     json.Append("\n    }");
                 }
             }
@@ -1102,6 +1113,7 @@ namespace HZExporter
             var skinnedImageEntries = new List<(int bv, int matIdx, string name, int role)>();
             var skinnedFactors = new HZShaderMap.Factors[materials.Length];
             var skinnedCustomMats = new HZShaderMap.CustomMaterial[materials.Length];
+            var skinnedMtoon = new HZShaderMap.MToonExtras[materials.Length];
             for (int mi = 0; mi < materials.Length; mi++)
             {
                 int capturedMi = mi;
@@ -1120,6 +1132,14 @@ namespace HZExporter
                     {
                         skinnedImageEntries.Add((AddBV(img.off, img.size), capturedMi, img.name, img.role));
                     });
+                    if (HZShaderMap.IsMToon(materials[mi]))
+                    {
+                        skinnedMtoon[mi] = HZShaderMap.EmbedMToon(materials[mi], bin, img =>
+                        {
+                            skinnedImageEntries.Add((AddBV(img.off, img.size), capturedMi, img.name, img.role));
+                        });
+                        if (skinnedMtoon[mi].doubleSided) matDoubleSided[mi] = true;
+                    }
                 }
             }
 
@@ -1128,6 +1148,7 @@ namespace HZExporter
             // --- Build JSON ---
             json.Append("{\n");
             json.Append("  \"asset\": { \"version\": \"2.0\", \"generator\": \"HZExporter\" },\n");
+            foreach (var mx in skinnedMtoon) if (mx != null) { json.Append("  \"extensionsUsed\": [\"VRMC_materials_mtoon\"],\n"); break; }
 
             // Buffers
             json.Append($"  \"buffers\": [{{ \"byteLength\": {binData.Length} }}],\n");
@@ -1162,14 +1183,14 @@ namespace HZExporter
                 json.Append("\n  ],\n");
             }
 
-            // Build per-material texture index lookup: [matIdx] → {albedo, normal, orm, emissive}
+            // Build per-material texture index lookup: [matIdx] → {albedo, normal, orm, emissive, shade, matcap, rim}
             var matTexMap = new Dictionary<int, int[]>();
             for (int i = 0; i < skinnedImageEntries.Count; i++)
             {
                 int mi2 = skinnedImageEntries[i].matIdx;
-                if (!matTexMap.ContainsKey(mi2)) matTexMap[mi2] = new int[] { -1, -1, -1, -1 };
+                if (!matTexMap.ContainsKey(mi2)) matTexMap[mi2] = new int[] { -1, -1, -1, -1, -1, -1, -1 };
                 int r = skinnedImageEntries[i].role;
-                if (r >= 0 && r < 4) matTexMap[mi2][r] = i;
+                if (r >= 0 && r < 7) matTexMap[mi2][r] = i;
             }
 
             json.Append("  \"materials\": [\n");
@@ -1186,7 +1207,7 @@ namespace HZExporter
                 else
                 {
                     var f = skinnedFactors[mi2];
-                    int[] ti = matTexMap.ContainsKey(mi2) ? matTexMap[mi2] : new int[] { -1, -1, -1, -1 };
+                    int[] ti = matTexMap.ContainsKey(mi2) ? matTexMap[mi2] : new int[] { -1, -1, -1, -1, -1, -1, -1 };
 
                     json.Append($"    {{\n      \"name\": \"{EscapeJson(smatName)}\",\n      \"pbrMetallicRoughness\": {{\n");
                     json.Append($"        \"baseColorFactor\": [{F(f.baseColor.r)}, {F(f.baseColor.g)}, {F(f.baseColor.b)}, {F(f.baseColor.a)}]");
@@ -1201,6 +1222,7 @@ namespace HZExporter
                         json.Append($",\n      \"emissiveFactor\": [{F(f.emissive.r)}, {F(f.emissive.g)}, {F(f.emissive.b)}]");
                     if (ti[3] >= 0) json.Append($",\n      \"emissiveTexture\": {{ \"index\": {ti[3]} }}");
                     if (matDoubleSided[mi2]) json.Append(",\n      \"doubleSided\": true");
+                    if (skinnedMtoon[mi2] != null) AppendMToonExtension(json, skinnedMtoon[mi2], ti);
                     json.Append("\n    }");
                 }
             }
@@ -1388,6 +1410,36 @@ namespace HZExporter
             string stem = shaderPath.Substring(0, shaderPath.Length - ext.Length);
             if (stem.EndsWith("_grass", StringComparison.Ordinal)) return shaderPath;
             return stem + "_grass" + ext;
+        }
+
+        // Append alphaMode/alphaCutoff + the VRMC_materials_mtoon extension onto an
+        // already-open standard glTF material (the engine's vrm_mtoon cook reads these).
+        // ti = per-material texture indices [albedo, normal, orm, emissive, shade, matcap, rim].
+        static void AppendMToonExtension(StringBuilder json, HZShaderMap.MToonExtras mt, int[] ti)
+        {
+            string am = mt.alphaMode == 2 ? "BLEND" : mt.alphaMode == 1 ? "MASK" : "OPAQUE";
+            json.Append($",\n      \"alphaMode\": \"{am}\"");
+            if (mt.alphaMode == 1) json.Append($",\n      \"alphaCutoff\": {F(mt.alphaCutoff)}");
+
+            int shadeIdx = mt.shadeUsesAlbedo ? ti[0] : ti[4];
+            int matcapIdx = ti[5];
+            int rimIdx = ti[6];
+
+            json.Append(",\n      \"extensions\": {\n        \"VRMC_materials_mtoon\": {\n");
+            json.Append("          \"specVersion\": \"1.0\",\n");
+            json.Append($"          \"shadeColorFactor\": [{F(mt.shadeColor.r)}, {F(mt.shadeColor.g)}, {F(mt.shadeColor.b)}],\n");
+            if (shadeIdx >= 0) json.Append($"          \"shadeMultiplyTexture\": {{ \"index\": {shadeIdx} }},\n");
+            json.Append($"          \"shadingShiftFactor\": {F(mt.shadingShift)},\n");
+            json.Append($"          \"shadingToonyFactor\": {F(mt.shadingToony)},\n");
+            json.Append($"          \"giEqualizationFactor\": {F(mt.giEqualization)},\n");
+            json.Append($"          \"matcapFactor\": [{F(mt.matcapFactor.r)}, {F(mt.matcapFactor.g)}, {F(mt.matcapFactor.b)}],\n");
+            if (matcapIdx >= 0) json.Append($"          \"matcapTexture\": {{ \"index\": {matcapIdx} }},\n");
+            json.Append($"          \"parametricRimColorFactor\": [{F(mt.rimColor.r)}, {F(mt.rimColor.g)}, {F(mt.rimColor.b)}],\n");
+            json.Append($"          \"parametricRimFresnelPowerFactor\": {F(mt.rimFresnelPower)},\n");
+            json.Append($"          \"parametricRimLiftFactor\": {F(mt.rimLift)},\n");
+            json.Append($"          \"rimLightingMixFactor\": {F(mt.rimLightingMix)}");
+            if (rimIdx >= 0) json.Append($",\n          \"rimMultiplyTexture\": {{ \"index\": {rimIdx} }}");
+            json.Append("\n        }\n      }");
         }
 
         static void WriteCustomMaterialJson(StringBuilder json, string matName, HZShaderMap.CustomMaterial cm)

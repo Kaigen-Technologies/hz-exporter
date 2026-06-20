@@ -392,6 +392,82 @@ namespace HZExporter
             return f;
         }
 
+        // ---- MToon (VRM 1.0) -------------------------------------------------
+        // The engine auto-detects MToon from the GLB material's VRMC_materials_mtoon
+        // extension (vrm_mtoon.c) and switches that material to the MToon shader,
+        // name-filling shade/matcap/rim from the extension. Base color / normal /
+        // emissive come from the standard glTF material (EmbedMaterial), so MToon
+        // materials run BOTH EmbedMaterial (PBR fields) and EmbedMToon (the extras).
+
+        public static bool IsMToon(Material mat) =>
+            mat != null && mat.shader != null && mat.shader.name.Contains("MToon10");
+
+        public class MToonExtras
+        {
+            public Color shadeColor = Color.white;       // shadeColorFactor (rgb)
+            public float shadingShift = -0.05f;          // shadingShiftFactor
+            public float shadingToony = 0.9f;            // shadingToonyFactor
+            public float giEqualization = 0.9f;          // giEqualizationFactor
+            public Color matcapFactor = Color.black;     // matcapFactor (rgb)
+            public Color rimColor = Color.black;          // parametricRimColorFactor (rgb)
+            public float rimFresnelPower = 5f;           // parametricRimFresnelPowerFactor
+            public float rimLift = 0f;                   // parametricRimLiftFactor
+            public float rimLightingMix = 1f;            // rimLightingMixFactor
+            public bool shadeUsesAlbedo = false;         // shadeMultiplyTexture == baseColorTexture
+            public int alphaMode = 0;                    // 0 opaque, 1 mask, 2 blend
+            public float alphaCutoff = 0.5f;
+            public bool doubleSided = false;
+        }
+
+        /// <summary>Read MToon10 params and embed the MToon-specific textures (shade role 4,
+        /// matcap role 5, rim role 6). When the shade texture is the same asset as the base
+        /// albedo, no new image is embedded — shadeUsesAlbedo flags the writer to reference the
+        /// existing baseColorTexture index instead (matches the source VRoid).</summary>
+        public static MToonExtras EmbedMToon(Material mat, MemoryStream bin, System.Action<ImageRecord> onImage)
+        {
+            var e = new MToonExtras();
+            if (mat == null) return e;
+
+            if (mat.HasProperty("_ShadeColor")) e.shadeColor = mat.GetColor("_ShadeColor");
+            if (mat.HasProperty("_ShadingShiftFactor")) e.shadingShift = mat.GetFloat("_ShadingShiftFactor");
+            if (mat.HasProperty("_ShadingToonyFactor")) e.shadingToony = mat.GetFloat("_ShadingToonyFactor");
+            if (mat.HasProperty("_GiEqualization")) e.giEqualization = mat.GetFloat("_GiEqualization");
+            if (mat.HasProperty("_MatcapColor")) e.matcapFactor = mat.GetColor("_MatcapColor");
+            if (mat.HasProperty("_RimColor")) e.rimColor = mat.GetColor("_RimColor");
+            if (mat.HasProperty("_RimFresnelPower")) e.rimFresnelPower = mat.GetFloat("_RimFresnelPower");
+            if (mat.HasProperty("_RimLift")) e.rimLift = mat.GetFloat("_RimLift");
+            if (mat.HasProperty("_RimLightingMix")) e.rimLightingMix = mat.GetFloat("_RimLightingMix");
+            if (mat.HasProperty("_AlphaMode")) e.alphaMode = Mathf.RoundToInt(mat.GetFloat("_AlphaMode"));
+            if (mat.HasProperty("_Cutoff")) e.alphaCutoff = mat.GetFloat("_Cutoff");
+            if (mat.HasProperty("_DoubleSided")) e.doubleSided = mat.GetFloat("_DoubleSided") > 0.5f;
+
+            Texture2D baseTex = (mat.HasProperty("_MainTex") ? mat.GetTexture("_MainTex") : null) as Texture2D;
+            if (baseTex == null && mat.HasProperty("_BaseMap")) baseTex = mat.GetTexture("_BaseMap") as Texture2D;
+
+            var shadeTex = (mat.HasProperty("_ShadeTex") ? mat.GetTexture("_ShadeTex") : null) as Texture2D;
+            if (shadeTex != null)
+            {
+                if (shadeTex == baseTex) e.shadeUsesAlbedo = true;
+                else EmbedRoleTexture(shadeTex, false, 4, bin, onImage);
+            }
+            var matcapTex = (mat.HasProperty("_MatcapTex") ? mat.GetTexture("_MatcapTex") : null) as Texture2D;
+            if (matcapTex != null) EmbedRoleTexture(matcapTex, false, 5, bin, onImage);
+            var rimTex = (mat.HasProperty("_RimTex") ? mat.GetTexture("_RimTex") : null) as Texture2D;
+            if (rimTex != null) EmbedRoleTexture(rimTex, false, 6, bin, onImage);
+
+            return e;
+        }
+
+        static void EmbedRoleTexture(Texture2D tex, bool isNormal, int role, MemoryStream bin, System.Action<ImageRecord> onImage)
+        {
+            byte[] png = HZGlbWriter.EncodeAndCachePng(tex, isNormal);
+            HZGlbWriter.PadTo4(bin);
+            int off = (int)bin.Position;
+            bin.Write(png, 0, png.Length);
+            HZGlbWriter.PadTo4(bin);
+            onImage(new ImageRecord { off = off, size = png.Length, name = HZGlbWriter.SanitizeName(tex.name ?? $"tex_role{role}"), role = role });
+        }
+
         /// <summary>Walk a custom-shader material's mapping properties, embed each referenced
         /// texture in the GLB binary chunk via `onImage` (which returns the assigned glTF
         /// texture index), and return a `CustomMaterial` describing all properties for the
