@@ -71,6 +71,11 @@ namespace HZExporter
             var names = new List<string>();
             if (root == null) return names;
             var valid = new HashSet<Renderer>(validRenderers ?? new Renderer[0]);
+            // The set of joints the model export actually emits (the primary SMR's non-null bones,
+            // by raw bone.name — the same strings the GLB nodes carry). Cloth bone_names and collider
+            // bone_names MUST be members; the engine resolves by exact string match and silently
+            // nukes a whole cloth on one miss.
+            var jointSet = JointSetFor(validRenderers);
             foreach (var cloth in root.GetComponentsInChildren<MagicaCloth>(true))
             {
                 var ct = cloth.SerializeData.clothType;
@@ -84,10 +89,27 @@ namespace HZExporter
                 {
                     continue;
                 }
-                string fileName = ExportClothToDir(cloth, outDir);
+                string fileName = ExportClothToDir(cloth, outDir, jointSet);
                 if (fileName != null) names.Add(fileName);
             }
             return names;
+        }
+
+        // Joints the model export emits = the non-null bones of the SMR with the most bones
+        // (the same "primary" the GLB skeleton is built from), keyed by raw bone.name.
+        static HashSet<string> JointSetFor(Renderer[] renderers)
+        {
+            var set = new HashSet<string>();
+            SkinnedMeshRenderer primary = null;
+            if (renderers != null)
+                foreach (var r in renderers)
+                    if (r is SkinnedMeshRenderer s && s.bones != null &&
+                        (primary == null || s.bones.Length > primary.bones.Length))
+                        primary = s;
+            if (primary != null)
+                foreach (var b in primary.bones)
+                    if (b != null) set.Add(b.name);
+            return set;
         }
 
         // --- .hzt writer helpers ---------------------------------------------------------
@@ -143,7 +165,7 @@ namespace HZExporter
 
         // --- export one component -------------------------------------------------------
 
-        static void ExportCloth(MagicaCloth cloth) => ExportClothToDir(cloth, OutDir);
+        static void ExportCloth(MagicaCloth cloth) => ExportClothToDir(cloth, OutDir, null);
 
         /// <summary>
         /// Exports one MeshCloth's authoring data to outDir as &lt;name&gt;_cloth.hzt and
@@ -151,12 +173,12 @@ namespace HZExporter
         /// valid source renderer/mesh. Used by both the standalone exec entry points and
         /// the scene exporter (which passes its per-scene cloth dir).
         /// </summary>
-        public static string ExportClothToDir(MagicaCloth cloth, string outDir)
+        public static string ExportClothToDir(MagicaCloth cloth, string outDir, HashSet<string> jointSet = null)
         {
             var sd = cloth.SerializeData;
             if (sd.clothType == ClothProcess.ClothType.BoneCloth ||
                 sd.clothType == ClothProcess.ClothType.BoneSpring)
-                return ExportBoneClothToDir(cloth, outDir);
+                return ExportBoneClothToDir(cloth, outDir, jointSet);
             var sel = cloth.GetSerializeData2().selectionData;
             if (sd.sourceRenderers.Count == 0 || sd.sourceRenderers[0] == null)
             {
@@ -234,7 +256,7 @@ namespace HZExporter
             }
             sb.Append('\n');
 
-            int colCount = WriteColliders(sb, sd);
+            int colCount = WriteColliders(sb, sd, jointSet);
 
             Directory.CreateDirectory(outDir);
             string fileName = SanitizeName(cloth.gameObject.name) + ".hzt";
@@ -245,39 +267,48 @@ namespace HZExporter
             return fileName;
         }
 
-        // Writes the `colliders <N>` block from a cloth's colliderList. Returns N.
-        static int WriteColliders(StringBuilder sb, ClothSerializeData sd)
+        // Writes the `colliders <N>` block from a cloth's colliderList. Returns N. Colliders whose
+        // bone can't be resolved to an exported joint are dropped with a loud error (never emitted
+        // with a non-joint bone_name, which the engine can't resolve).
+        static int WriteColliders(StringBuilder sb, ClothSerializeData sd, HashSet<string> jointSet)
         {
             var colliders = sd.colliderCollisionConstraint.colliderList;
-            var validCols = new List<ColliderComponent>();
+            var emit = new List<ColliderComponent>();
+            var bones = new List<Transform>();
             if (colliders != null)
                 foreach (var c in colliders)
-                    if (c != null) validCols.Add(c);
+                {
+                    if (c == null) continue;
+                    // bone_name must be an EXPORTED joint. Walk up from the collider (incl. itself)
+                    // to the nearest ancestor that's in the joint set. The local transform below is
+                    // taken relative to that joint, so the offset stays correct even across pruned
+                    // intermediates.
+                    Transform bone = c.transform;
+                    while (bone != null && jointSet != null && !jointSet.Contains(bone.name)) bone = bone.parent;
+                    if (bone == null)
+                    {
+                        Debug.LogError($"[HZClothExporter] collider '{c.gameObject.name}' has no exported-joint " +
+                                       "ancestor — dropped (engine can't resolve it).");
+                        continue;
+                    }
+                    emit.Add(c);
+                    bones.Add(bone);
+                }
 
-            sb.Append("colliders ").Append(validCols.Count).Append('\n');
-            for (int ci = 0; ci < validCols.Count; ci++)
+            sb.Append("colliders ").Append(emit.Count).Append('\n');
+            for (int ci = 0; ci < emit.Count; ci++)
             {
-                var col = validCols[ci];
+                var col = emit[ci];
+                var bone = bones[ci];
                 if (ci > 0) sb.Append('\n');
 
-                // dedicated "Magica ... Collider" GameObjects bind to their
-                // parent bone with the GO's local pose; components placed
-                // directly on a bone bind to it at identity
-                Transform bone;
-                Vector3 lp;
-                Quaternion lr;
-                if (col.transform.parent != null && col.gameObject.name.StartsWith("Magica"))
-                {
-                    bone = col.transform.parent;
-                    lp = col.transform.localPosition;
-                    lr = col.transform.localRotation;
-                }
-                else
-                {
-                    bone = col.transform;
-                    lp = Vector3.zero;
-                    lr = Quaternion.identity;
-                }
+                // Collider transform relative to its bound joint (same node-local Unity→glTF
+                // conversion as joint locals — applied at the field write below). For a direct
+                // child of the bone this is just its local pose; the matrix form also handles the
+                // bone==collider (identity) and ancestor (composed) cases uniformly.
+                Matrix4x4 rel = bone.worldToLocalMatrix * col.transform.localToWorldMatrix;
+                Vector3 lp = rel.GetColumn(3);
+                Quaternion lr = rel.rotation;
                 lp += lr * new Vector3(col.center.x, col.center.y, col.center.z);
 
                 uint type;
@@ -313,7 +344,7 @@ namespace HZExporter
                 FieldV3(sb, 1, "size", size);
                 FieldB(sb, 1, "aligned_center", alignedCenter);
             }
-            return validCols.Count;
+            return emit.Count;
         }
 
         /// <summary>
@@ -324,7 +355,7 @@ namespace HZExporter
         /// Bone names map to the model's GLB joint names. selection_* stay empty
         /// (the per-bone resolution happens here; the engine consumes bone_attributes).
         /// </summary>
-        static string ExportBoneClothToDir(MagicaCloth cloth, string outDir)
+        static string ExportBoneClothToDir(MagicaCloth cloth, string outDir, HashSet<string> jointSet = null)
         {
             var sd = cloth.SerializeData;
             // collect bones IN ORDER (each root + descendants, dedup) so we can
@@ -391,9 +422,39 @@ namespace HZExporter
                     }
                 }
             }
+            // Intersect the chain with the model export's actual joint set: keep only bones that
+            // exist in the exported skeleton (by exact name). This drops the '_end' tip markers
+            // (the model prunes them) and anything else the model didn't emit, so every bone_name
+            // the engine sees resolves — no silent whole-cloth nuke. When no joint set is supplied
+            // (standalone exec entry points) fall back to dropping '_end' leaf tips.
+            if (jointSet != null)
+            {
+                for (int b = boneTransforms.Count - 1; b >= 0; b--)
+                {
+                    if (jointSet.Contains(boneNames[b])) continue;
+                    boneTransforms.RemoveAt(b);
+                    boneNames.RemoveAt(b);
+                    boneAttrs.RemoveAt(b);
+                }
+            }
+            else
+            {
+                for (int b = boneTransforms.Count - 1; b >= 0; b--)
+                {
+                    if (!boneNames[b].EndsWith("_end", System.StringComparison.Ordinal)) continue;
+                    bool hasChild = false;
+                    for (int c = 0; c < boneTransforms.Count; c++)
+                        if (c != b && boneTransforms[c].parent == boneTransforms[b]) { hasChild = true; break; }
+                    if (hasChild) continue;
+                    boneTransforms.RemoveAt(b);
+                    boneNames.RemoveAt(b);
+                    boneAttrs.RemoveAt(b);
+                }
+            }
+
             if (boneNames.Count == 0)
             {
-                Debug.LogError($"[HZClothExporter] {cloth.name}: BoneCloth has no root bones");
+                Debug.LogError($"[HZClothExporter] {cloth.name}: BoneCloth has no bones in the exported skeleton");
                 return null;
             }
 
@@ -418,7 +479,7 @@ namespace HZExporter
             FieldU(sb, 0, "target_vertex_count", 0u);
             sb.Append("selection_positions 0\n");
             sb.Append("selection_attributes 0\n");
-            int colCount = WriteColliders(sb, sd);
+            int colCount = WriteColliders(sb, sd, jointSet);
 
             // BlobArray(StringBlob): inline space-separated quoted tokens on the field line
             sb.Append("bone_names ").Append(boneNames.Count);

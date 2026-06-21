@@ -1246,9 +1246,11 @@ public static class HZExportCommands
                     if (HZClothIntegration.ExportMeshCloths != null)
                     {
                         // MeshCloth authoring → per-character cloth blobs + EcsClothRefs.
+                        // Namespaced by character (scene/<char>/cloth) so two characters with
+                        // same-named cloths (e.g. both "skirt") don't collide on one flat file.
                         string clothSceneNm = SanitizeName(scene.name);
-                        string clothOutDir = $"{OutputDir}/{clothSceneNm}/cloth";
-                        string clothAssetPrefix = $"{AssetPrefix}/{clothSceneNm}/cloth";
+                        string clothOutDir = $"{OutputDir}/{clothSceneNm}/{charName}/cloth";
+                        string clothAssetPrefix = $"{AssetPrefix}/{clothSceneNm}/{charName}/cloth";
                         var clothFiles = HZClothIntegration.ExportMeshCloths(go, validSmrs.ToArray(), clothOutDir);
                         const int ECS_CLOTH_MAX_PER_MODEL = 24;
                         if (clothFiles.Count > ECS_CLOTH_MAX_PER_MODEL)
