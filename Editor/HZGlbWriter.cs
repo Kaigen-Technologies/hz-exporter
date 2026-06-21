@@ -693,6 +693,10 @@ namespace HZExporter
             // submeshIndicesAccs[mi][s] = index accessor for sub-mesh s of SMR mi.
             int[][] sharedAccs = new int[meshCount][];
             int[][] submeshIndicesAccs = new int[meshCount][];
+            // Blendshapes (glTF morph targets), per SMR: POSITION/NORMAL delta accessors + names.
+            int[][] morphPosAccs = new int[meshCount][];
+            int[][] morphNormAccs = new int[meshCount][];
+            string[][] morphNames = new string[meshCount][];
 
             for (int mi = 0; mi < meshCount; mi++)
             {
@@ -891,6 +895,53 @@ namespace HZExporter
                 int colorAcc = hasColors ? AddAcc(colorBV, UNSIGNED_BYTE, vertexCount, "VEC4", null, null, normalized: true) : -1;
                 int jiAcc = AddAcc(jiBV, jointsU16 ? UNSIGNED_SHORT : UNSIGNED_BYTE, vertexCount, "VEC4");
                 int jwAcc = AddAcc(jwBV, FLOAT, vertexCount, "VEC4");
+
+                // Blendshapes → glTF morph targets. POSITION+NORMAL deltas, transformed like the
+                // base verts (deltas use the linear part only — translation cancels — then X negated).
+                // Multi-frame blendshapes collapse to the final (100%) frame, as glTF targets are
+                // single-delta.
+                int bsCount = mesh.blendShapeCount;
+                int[] bsPosAcc = new int[bsCount];
+                int[] bsNormAcc = new int[bsCount];
+                string[] bsNames = new string[bsCount];
+                if (bsCount > 0)
+                {
+                    var dV = new Vector3[vertexCount];
+                    var dN = new Vector3[vertexCount];
+                    var dT = new Vector3[vertexCount];
+                    for (int b = 0; b < bsCount; b++)
+                    {
+                        bsNames[b] = StripBlendshapeName(mesh.GetBlendShapeName(b));
+                        int fc = mesh.GetBlendShapeFrameCount(b);
+                        mesh.GetBlendShapeFrameVertices(b, fc - 1, dV, dN, dT);
+
+                        int dpOff = (int)bin.Position;
+                        float[] dpMin = { float.MaxValue, float.MaxValue, float.MaxValue };
+                        float[] dpMax = { float.MinValue, float.MinValue, float.MinValue };
+                        for (int i = 0; i < vertexCount; i++)
+                        {
+                            Vector3 p = preXform.MultiplyVector(dV[i]);
+                            float x = -p.x, y = p.y, z = p.z;
+                            WriteF32(bin, x); WriteF32(bin, y); WriteF32(bin, z);
+                            dpMin[0] = Math.Min(dpMin[0], x); dpMin[1] = Math.Min(dpMin[1], y); dpMin[2] = Math.Min(dpMin[2], z);
+                            dpMax[0] = Math.Max(dpMax[0], x); dpMax[1] = Math.Max(dpMax[1], y); dpMax[2] = Math.Max(dpMax[2], z);
+                        }
+                        int dpBV = AddBV(dpOff, (int)bin.Position - dpOff, 12);
+                        bsPosAcc[b] = AddAcc(dpBV, FLOAT, vertexCount, "VEC3", dpMin, dpMax);
+
+                        int dnOff = (int)bin.Position;
+                        for (int i = 0; i < vertexCount; i++)
+                        {
+                            Vector3 n = preXformNormal.MultiplyVector(dN[i]);
+                            WriteF32(bin, -n.x); WriteF32(bin, n.y); WriteF32(bin, n.z);
+                        }
+                        int dnBV = AddBV(dnOff, (int)bin.Position - dnOff, 12);
+                        bsNormAcc[b] = AddAcc(dnBV, FLOAT, vertexCount, "VEC3");
+                    }
+                }
+                morphPosAccs[mi] = bsPosAcc;
+                morphNormAccs[mi] = bsNormAcc;
+                morphNames[mi] = bsNames;
 
                 int[] subAccs = new int[submeshCount];
                 for (int s = 0; s < submeshCount; s++)
@@ -1235,29 +1286,76 @@ namespace HZExporter
             }
             json.Append("\n  ],\n");
 
-            // Meshes
-            json.Append("  \"meshes\": [\n");
+            // Group SMRs that carry the SAME (ordered, prefix-stripped) blendshape set into ONE
+            // glTF mesh with multiple primitives — a blendshape set is per-mesh in the engine, but
+            // the FBX often splits one blendshaped mesh into several SMRs. Non-blendshape SMRs and
+            // distinct sets stay separate. Key = "|"-joined target names ("" = no blendshapes →
+            // each its own singleton group).
+            var groups = new List<List<int>>();
+            var keyToGroup = new Dictionary<string, int>();
             for (int mi = 0; mi < meshCount; mi++)
             {
-                if (mi > 0) json.Append(",\n");
-                var acc = sharedAccs[mi];           // [posAcc, normAcc, tanAcc, uvAcc, jointsAcc, weightsAcc, uv1Acc, colorAcc]
-                int[] subAccs = submeshIndicesAccs[mi];
-                int[] matRow = matIndexPerSmr[mi];
-                string meshName = smrs[mi].sharedMesh.name ?? $"mesh_{mi}";
+                var nm = morphNames[mi];
+                string key = (nm != null && nm.Length > 0) ? string.Join("|", nm) : null;
+                if (key == null) { groups.Add(new List<int> { mi }); continue; }
+                if (keyToGroup.TryGetValue(key, out int gi)) groups[gi].Add(mi);
+                else { keyToGroup[key] = groups.Count; groups.Add(new List<int> { mi }); }
+            }
+
+            // Meshes — one per group; primitives are every grouped SMR's submeshes. Each primitive
+            // keeps its own accessors + per-primitive morph deltas; weights/targetNames are shared
+            // once at the mesh level.
+            json.Append("  \"meshes\": [\n");
+            for (int g = 0; g < groups.Count; g++)
+            {
+                if (g > 0) json.Append(",\n");
+                var group = groups[g];
+                string[] gNames = morphNames[group[0]];
+                int bsN = gNames != null ? gNames.Length : 0;
+                string meshName = smrs[group[0]].sharedMesh.name ?? $"mesh_{g}";
+
                 json.Append($"    {{ \"name\": \"{EscapeJson(meshName)}\", \"primitives\": [");
-                for (int s = 0; s < subAccs.Length; s++)
+                bool firstPrim = true;
+                foreach (int mi in group)
                 {
-                    if (s > 0) json.Append(", ");
-                    json.Append($"{{ \"indices\": {subAccs[s]}, \"attributes\": {{ \"POSITION\": {acc[0]}, \"NORMAL\": {acc[1]}");
-                    if (acc[2] >= 0) json.Append($", \"TANGENT\": {acc[2]}");
-                    if (acc[3] >= 0) json.Append($", \"TEXCOORD_0\": {acc[3]}");
-                    if (acc[6] >= 0) json.Append($", \"TEXCOORD_1\": {acc[6]}");
-                    if (acc[7] >= 0) json.Append($", \"COLOR_0\": {acc[7]}");
-                    json.Append($", \"JOINTS_0\": {acc[4]}, \"WEIGHTS_0\": {acc[5]}");
-                    int matIdx = matRow[Math.Min(s, matRow.Length - 1)];
-                    json.Append($" }}, \"material\": {matIdx} }}");
+                    var acc = sharedAccs[mi];
+                    int[] subAccs = submeshIndicesAccs[mi];
+                    int[] matRow = matIndexPerSmr[mi];
+                    int[] mPos = morphPosAccs[mi]; int[] mNorm = morphNormAccs[mi];
+                    string targetsJson = "";
+                    if (bsN > 0)
+                    {
+                        var tb = new StringBuilder(", \"targets\": [");
+                        for (int b = 0; b < bsN; b++)
+                        {
+                            if (b > 0) tb.Append(", ");
+                            tb.Append($"{{ \"POSITION\": {mPos[b]}, \"NORMAL\": {mNorm[b]} }}");
+                        }
+                        tb.Append("]");
+                        targetsJson = tb.ToString();
+                    }
+                    for (int s = 0; s < subAccs.Length; s++)
+                    {
+                        if (!firstPrim) json.Append(", ");
+                        firstPrim = false;
+                        json.Append($"{{ \"indices\": {subAccs[s]}, \"attributes\": {{ \"POSITION\": {acc[0]}, \"NORMAL\": {acc[1]}");
+                        if (acc[2] >= 0) json.Append($", \"TANGENT\": {acc[2]}");
+                        if (acc[3] >= 0) json.Append($", \"TEXCOORD_0\": {acc[3]}");
+                        if (acc[6] >= 0) json.Append($", \"TEXCOORD_1\": {acc[6]}");
+                        if (acc[7] >= 0) json.Append($", \"COLOR_0\": {acc[7]}");
+                        json.Append($", \"JOINTS_0\": {acc[4]}, \"WEIGHTS_0\": {acc[5]}");
+                        int matIdx = matRow[Math.Min(s, matRow.Length - 1)];
+                        json.Append($" }}{targetsJson}, \"material\": {matIdx} }}");
+                    }
                 }
-                json.Append("] }");
+                json.Append("]");
+                if (bsN > 0)
+                {
+                    json.Append(", \"weights\": [" + string.Join(", ", System.Linq.Enumerable.Repeat("0", bsN)) + "]");
+                    json.Append(", \"extras\": { \"targetNames\": [" +
+                                string.Join(", ", System.Array.ConvertAll(gNames, n => "\"" + EscapeJson(n) + "\"")) + "] }");
+                }
+                json.Append(" }");
             }
             json.Append("\n  ],\n");
 
@@ -1290,12 +1388,11 @@ namespace HZExporter
                 json.Append(" },\n");
             }
 
-            // Mesh nodes
-            for (int mi = 0; mi < meshCount; mi++)
+            // Mesh nodes — one per group (= one per glTF mesh)
+            for (int g = 0; g < groups.Count; g++)
             {
-                int nodeIdx = jointCount + mi;
-                json.Append($"    {{ \"mesh\": {mi}, \"skin\": 0 }}");
-                if (mi < meshCount - 1) json.Append(",");
+                json.Append($"    {{ \"mesh\": {g}, \"skin\": 0 }}");
+                if (g < groups.Count - 1) json.Append(",");
                 json.Append("\n");
             }
             json.Append("  ],\n");
@@ -1355,9 +1452,9 @@ namespace HZExporter
             // Root bones (no parent)
             for (int i = 0; i < jointCount; i++)
                 if (parentIndices[i] == -1) sceneNodes.Add(i);
-            // Mesh nodes
-            for (int mi = 0; mi < meshCount; mi++)
-                sceneNodes.Add(jointCount + mi);
+            // Mesh nodes (one per group)
+            for (int g = 0; g < groups.Count; g++)
+                sceneNodes.Add(jointCount + g);
 
             json.Append("  \"scene\": 0,\n");
             json.Append($"  \"scenes\": [{{ \"nodes\": [{string.Join(", ", sceneNodes)}] }}]\n");
@@ -1556,6 +1653,16 @@ namespace HZExporter
 
         internal static string SanitizeName(string name) =>
             (name ?? "").Replace(" ", "_").Replace("/", "_").Replace("\\", "_");
+
+        // FBX merges prefix blendshape names like "Face__merged__2_blendShape.Fcl_ALL_Neutral".
+        // The engine wants the bare authored name ("Fcl_ALL_Neutral") — take the part after the
+        // last '.'. Stripping also lets the split face SMRs group as one blendshape set.
+        static string StripBlendshapeName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            int dot = name.LastIndexOf('.');
+            return dot >= 0 && dot < name.Length - 1 ? name.Substring(dot + 1) : name;
+        }
 
         static void WriteU16(MemoryStream s, ushort v) { s.WriteByte((byte)(v & 0xFF)); s.WriteByte((byte)(v >> 8)); }
         static void WriteU32(MemoryStream s, uint v) { var b = BitConverter.GetBytes(v); s.Write(b, 0, 4); }
