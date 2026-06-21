@@ -1393,6 +1393,27 @@ public static class HZExportCommands
             }
         }
 
+        // Map a timeline-bound Animator → the character key in deferredSkinned (by SMR membership),
+        // so timeline clips can be fed into the right character's GLB. Null when unbound/unmatched.
+        System.Func<Animator, string> resolveChar = anim =>
+        {
+            if (anim == null) return null;
+            var set = new HashSet<SkinnedMeshRenderer>(anim.GetComponentsInChildren<SkinnedMeshRenderer>(true));
+            foreach (var kv in deferredSkinned)
+                foreach (var s in kv.Value.smrs)
+                    if (set.Contains(s)) return kv.Key;
+            return null;
+        };
+        // Add timeline AnimationTrack clips to the matching character's GLB anim set (dedup by name)
+        // so they get baked + cooked alongside the controller clips, BEFORE the GLB export below.
+        HZEmoteExporter.CollectTimelineClips(roots, resolveChar, (charName, clip) =>
+        {
+            if (!deferredSkinned.TryGetValue(charName, out var d)) return;
+            string nm = SanitizeName(clip.name);
+            if (d.animClips.Any(a => a.name == nm)) return;
+            d.animClips.Add(new HZGlbWriter.AnimClipInfo { clip = clip, name = nm, skeletonRoot = d.entityRoot.gameObject });
+        });
+
         // Export deferred skinned meshes (with collected animations)
         foreach (var kvp in deferredSkinned)
         {
@@ -1400,6 +1421,9 @@ public static class HZExportCommands
             var animArray = d.animClips.Count > 0 ? d.animClips.ToArray() : null;
             HZGlbWriter.ExportSkinnedMesh(d.smrs, d.materials, d.primarySmr, d.entityRoot, d.glbPath, animArray);
         }
+
+        // Timelines → EmoteBlobAsset .hzt (paths point at the just-baked GLB anims).
+        HZEmoteExporter.Export(roots, resolveChar, OutputDir, AssetPrefix);
 
         // Terrain trees: TerrainData.treeInstances (separate from grass details). Each instance
         // becomes an individual entity referencing its prototype's model (LOD0 + extra LODs).
