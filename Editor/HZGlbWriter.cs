@@ -725,15 +725,22 @@ namespace HZExporter
                 Matrix4x4 preXform = Matrix4x4.identity;
                 if (smr != primarySmr && bindPoses.Length > 0 && mesh.bindposes.Length > 0)
                 {
-                    // Find a bone index where both bindposes reference a live Transform (safest).
-                    int refIdx = 0;
-                    for (int bi = 0; bi < System.Math.Min(bindPoses.Length, mesh.bindposes.Length); bi++)
+                    // preXform must compare the bindposes of the SAME bone in both skeletons:
+                    //   preXform = primaryBp[bone]^-1 · smrBp[bone]
+                    // This SMR's bones[] is NOT index-aligned with the primary's (different length
+                    // and order — e.g. the sleeves' bones[0] is J_Sec_Hair2_05, not Root), so we
+                    // must map the SMR's reference bone to its OWN index in the primary via
+                    // boneToIndex, not reuse the same array index. (Using a shared index silently
+                    // mixed two different bones and displaced the mesh by ~1.5 m.)
+                    int smrRef = -1, primRef = -1;
+                    for (int bi = 0; bi < smr.bones.Length && bi < mesh.bindposes.Length; bi++)
                     {
-                        if (bi < primarySmr.bones.Length && bi < smr.bones.Length
-                            && primarySmr.bones[bi] != null && smr.bones[bi] != null)
-                        { refIdx = bi; break; }
+                        if (smr.bones[bi] != null
+                            && boneToIndex.TryGetValue(smr.bones[bi], out int pi) && pi < bindPoses.Length)
+                        { smrRef = bi; primRef = pi; break; }
                     }
-                    preXform = bindPoses[refIdx].inverse * mesh.bindposes[refIdx];
+                    if (smrRef >= 0)
+                        preXform = bindPoses[primRef].inverse * mesh.bindposes[smrRef];
                 }
                 Matrix4x4 preXformNormal = preXform.inverse.transpose; // for normals/tangents (no translation)
 
