@@ -7,6 +7,9 @@ using System.Threading;
 using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor; // AssemblyReloadEvents
+#endif
 
 /// <summary>
 /// Listens on TCP port 7322 for commands from external processes.
@@ -53,6 +56,20 @@ public static class RemoteRefresh
         Start();
         EditorApplication.update += OnUpdate;
         CompilationPipeline.assemblyCompilationFinished += OnCompilationFinished;
+        // CRITICAL: free the port BEFORE the next domain reload. Without this the
+        // old listener socket can still hold 7322 when the new domain's
+        // ListenLoop calls Start() -> AddressAlreadyInUse -> the listener is
+        // never rebound and the editor goes silent until a manual recompile.
+        AssemblyReloadEvents.beforeAssemblyReload += Stop;
+    }
+
+    static void Stop()
+    {
+        s_running = false;
+        try { s_listener?.Stop(); } catch { }
+        s_listener = null;
+        try { s_thread?.Join(200); } catch { }
+        s_thread = null;
     }
 
     static void Start()
@@ -68,11 +85,32 @@ public static class RemoteRefresh
     {
         try
         {
-            s_listener = new TcpListener(IPAddress.Loopback, Port);
             // Intentionally NO SO_REUSEADDR: asset import workers share this
             // assembly and would otherwise also bind the port, causing TCP
             // commands to be round-robin'd between editor and workers.
-            s_listener.Start();
+            // Retry the bind: on a fast domain reload the previous socket may
+            // still be tearing down for a few ms (beforeAssemblyReload Stop()
+            // normally frees it first, this is the belt-and-suspenders path).
+            bool bound = false;
+            for (int attempt = 0; attempt < 40 && s_running && !bound; attempt++)
+            {
+                try
+                {
+                    s_listener = new TcpListener(IPAddress.Loopback, Port);
+                    s_listener.Start();
+                    bound = true;
+                }
+                catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                {
+                    s_listener = null;
+                    Thread.Sleep(50);
+                }
+            }
+            if (!bound)
+            {
+                Debug.LogWarning($"[RemoteRefresh] Port {Port} still in use after retries — giving up.");
+                return;
+            }
 
             while (s_running)
             {
