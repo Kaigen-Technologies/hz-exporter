@@ -594,6 +594,15 @@ namespace HZExporter
             public GameObject skeletonRoot;
         }
 
+        /// Set by the MagicaCloth2 module (separate asmdef) at editor load. Given a
+        /// character root, returns the set of bone Transforms used by its cloth
+        /// chains (rootBones + descendants). These must be exported as skeleton
+        /// joints even when NOT skin-weighted — VRoid _end terminator bones aren't
+        /// in SMR.bones, so without this every MagicaCloth chain loses its last
+        /// segment in-engine (the new leaf bone freezes). Null when MagicaCloth
+        /// isn't present.
+        public static System.Func<Transform, System.Collections.Generic.HashSet<Transform>> ClothBoneCollector;
+
         /// <summary>Export multi-mesh skinned model as .glb with skeleton and optional animations.
         /// `entityRoot` is the GameObject that becomes the entity in the engine (typically the
         /// Animator-owning GO). It anchors the bone hierarchy: any root bone whose Unity parent
@@ -651,6 +660,55 @@ namespace HZExporter
                 if (bones[i] == null) { parentIndices[i] = -1; continue; }
                 var parent = bones[i].parent;
                 parentIndices[i] = (parent != null && boneToIndex.TryGetValue(parent, out int pi)) ? pi : -1;
+            }
+
+            // Append cloth-chain bones that the skin doesn't reference (VRoid _end
+            // terminators MagicaCloth simulates). They exist in the rig but aren't
+            // in SMR.bones, so the model would otherwise omit them and every cloth
+            // chain would lose its last simulated segment. Added AFTER the skin
+            // joints so existing joint indices (weights, anim channels) are unchanged.
+            if (ClothBoneCollector != null)
+            {
+                var clothBones = ClothBoneCollector(entityRoot);
+                if (clothBones != null && clothBones.Count > 0)
+                {
+                    int origJointCount = jointCount;
+                    var boneList = new List<Transform>(bones);
+                    var bindList = new List<Matrix4x4>();
+                    for (int i = 0; i < jointCount; i++)
+                        bindList.Add(i < bindPoses.Length ? bindPoses[i] : Matrix4x4.identity);
+                    // Resolve in hierarchy order: a tip is added only once its parent
+                    // is a joint, so multi-level tips (_end_01 -> _end_01_end) both land.
+                    bool addedAny = true;
+                    while (addedAny)
+                    {
+                        addedAny = false;
+                        foreach (var cb in clothBones)
+                        {
+                            if (cb == null || boneToIndex.ContainsKey(cb)) continue;
+                            var p = cb.parent;
+                            if (p == null || !boneToIndex.TryGetValue(p, out int pidx)) continue;
+                            int idx = boneList.Count;
+                            boneToIndex[cb] = idx;
+                            boneList.Add(cb);
+                            // bindpose_child = inverse(localTRS) * bindpose_parent
+                            Matrix4x4 local = Matrix4x4.TRS(cb.localPosition, cb.localRotation, cb.localScale);
+                            bindList.Add(local.inverse * bindList[pidx]);
+                            addedAny = true;
+                        }
+                    }
+                    bones = boneList.ToArray();
+                    bindPoses = bindList.ToArray();
+                    jointCount = bones.Length;
+                    parentIndices = new int[jointCount];
+                    for (int i = 0; i < jointCount; i++)
+                    {
+                        if (bones[i] == null) { parentIndices[i] = -1; continue; }
+                        var p = bones[i].parent;
+                        parentIndices[i] = (p != null && boneToIndex.TryGetValue(p, out int pi)) ? pi : -1;
+                    }
+                    Debug.Log($"[HZGlbWriter] added {jointCount - origJointCount} cloth-tip bones to skeleton (now {jointCount} joints)");
+                }
             }
 
             var bin = new MemoryStream();

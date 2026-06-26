@@ -76,6 +76,13 @@ namespace HZExporter
             // bone_names MUST be members; the engine resolves by exact string match and silently
             // nukes a whole cloth on one miss.
             var jointSet = JointSetFor(validRenderers);
+            // Keep the cloth chains' own bones (incl. VRoid _end terminators that
+            // aren't skin-weighted). The model exporter adds these same bones to the
+            // GLB skeleton (via HZGlbWriter.ClothBoneCollector), so they resolve
+            // in-engine and every chain keeps its full length. Without this the
+            // chains are short a segment and the new leaf bones freeze.
+            foreach (var t in CollectClothChainBones(root))
+                jointSet.Add(t.name);
             foreach (var cloth in root.GetComponentsInChildren<MagicaCloth>(true))
             {
                 var ct = cloth.SerializeData.clothType;
@@ -110,6 +117,40 @@ namespace HZExporter
                 foreach (var b in primary.bones)
                     if (b != null) set.Add(b.name);
             return set;
+        }
+
+        // All bone Transforms simulated by BoneCloth/BoneSpring chains under `root`
+        // (each rootBone + its descendants — exactly what MagicaCloth simulates,
+        // including the _end terminator leaves). The model exporter adds these to
+        // the GLB skeleton and the cloth exporter keeps them; both must agree.
+        public static HashSet<Transform> CollectClothChainBones(GameObject root)
+        {
+            var set = new HashSet<Transform>();
+            if (root == null) return set;
+            foreach (var cloth in root.GetComponentsInChildren<MagicaCloth>(true))
+            {
+                var ct = cloth.SerializeData.clothType;
+                if (ct != ClothProcess.ClothType.BoneCloth &&
+                    ct != ClothProcess.ClothType.BoneSpring) continue;
+                var roots = cloth.SerializeData.rootBones;
+                if (roots == null) continue;
+                foreach (var rb in roots)
+                {
+                    if (rb == null) continue;
+                    foreach (var t in rb.GetComponentsInChildren<Transform>(true))
+                        if (t != null) set.Add(t);
+                }
+            }
+            return set;
+        }
+
+        // Bridge into the (MagicaCloth-agnostic) model exporter: lets HZGlbWriter
+        // include cloth-chain bones in the GLB skeleton. Runs once at editor load.
+        [UnityEditor.InitializeOnLoadMethod]
+        static void RegisterClothBoneCollector()
+        {
+            HZGlbWriter.ClothBoneCollector = (Transform t) =>
+                CollectClothChainBones(t != null ? t.gameObject : null);
         }
 
         // --- .hzt writer helpers ---------------------------------------------------------
@@ -358,8 +399,18 @@ namespace HZExporter
         static string ExportBoneClothToDir(MagicaCloth cloth, string outDir, HashSet<string> jointSet = null)
         {
             var sd = cloth.SerializeData;
-            // collect bones IN ORDER (each root + descendants, dedup) so we can
-            // override attributes by index after building the default.
+            // Collect bones in MC2's EXACT capture order so the per-bone painted
+            // attribute mapping below (by index) lines up.
+            //
+            // CRITICAL: MagicaCloth orders its bones with a STACK / LIFO depth-first
+            // walk (RenderSetupData.cs: push every rootBone, then pop; on each pop
+            // push child 0..N so they pop in REVERSE order). selectionData.attributes
+            // is indexed in THIS order (ClothProcess fills it via the same setup-data
+            // transform index). Using Unity's GetComponentsInChildren() here instead
+            // produces a DIFFERENT depth-first order (children forward, root first),
+            // so attributes[i] referred to a different bone — which scattered the
+            // "roots Fixed" flags onto mid-chain bones and pinned the strands (the
+            // hair froze below each mis-pinned bone). Mirror MC2's walk 1:1.
             var boneTransforms = new List<Transform>();
             var boneNames = new List<string>();
             var boneAttrs = new List<int>();
@@ -367,27 +418,30 @@ namespace HZExporter
             // any rootBone is Fixed, even when reached as another root's descendant
             var rootSet = new HashSet<Transform>();
             foreach (var r in sd.rootBones) if (r != null) rootSet.Add(r);
-            foreach (var root in sd.rootBones)
             {
-                if (root == null) continue;
-                foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                var stack = new Stack<Transform>(256);
+                foreach (var r in sd.rootBones) if (r != null) stack.Push(r);
+                while (stack.Count > 0)
                 {
+                    var t = stack.Pop();
                     if (!seen.Add(t)) continue;
                     boneTransforms.Add(t);
                     boneNames.Add(t.name);
                     boneAttrs.Add(rootSet.Contains(t) ? 1 : 2); // 1=Fixed root, 2=Move
+                    for (int i = 0; i < t.childCount; i++) stack.Push(t.GetChild(i));
                 }
             }
 
             // Painted override (MC2: valid selectionData attributes win over the
             // root-default). selectionData is the serialized paint; boneAttributeDict
-            // is [NonSerialized] runtime-only, so the paint lives here. MC2 builds the
-            // selection FROM the bone proxy in bone order, so attributes[i] is bone i
-            // — map by index (counts match exactly, one painted entry per bone).
+            // is [NonSerialized] runtime-only, so the paint lives here. attributes[i]
+            // is bone i in MC2's setup-data order — which boneTransforms now mirrors,
+            // so the index mapping is valid. We VERIFY that below by position.
             var bsel = cloth.GetSerializeData2().selectionData;
             if (bsel != null && bsel.IsValid() &&
                 bsel.attributes.Length == boneTransforms.Count)
             {
+                VerifyBoneAttributeOrder(cloth, bsel, boneTransforms);
                 int fixedN = 0, moveN = 0, invalidN = 0;
                 for (int b = 0; b < boneTransforms.Count; b++)
                 {
@@ -398,6 +452,15 @@ namespace HZExporter
                 }
                 Debug.Log($"[HZClothExporter] {cloth.name}: BoneCloth painted attributes " +
                           $"fixed={fixedN} move={moveN} invalid={invalidN}");
+                // Safety net: a Fixed bone that is NOT a chain root pins the strand
+                // mid-way (this was the long-hair freeze bug). Legal in MC2 (painting)
+                // but rare — surface it loudly so an ordering regression can't pass
+                // silently again.
+                for (int b = 0; b < boneTransforms.Count; b++)
+                    if (boneAttrs[b] == 1 && !rootSet.Contains(boneTransforms[b]))
+                        Debug.LogWarning($"[HZClothExporter] {cloth.name}: non-root bone " +
+                            $"'{boneNames[b]}' is Fixed (pins the strand here). If the hair " +
+                            "is meant to swing freely this indicates a bone-order mismatch.");
 
                 // MC2 excludes Invalid-painted verts from the proxy. Drop leaf Invalid
                 // bones (attr 0); warn if an Invalid bone has simulated children, since
@@ -498,6 +561,40 @@ namespace HZExporter
             Debug.Log($"[HZClothExporter] {cloth.name}: BoneCloth bones={boneNames.Count} " +
                       $"colliders={colCount} -> {outPath}");
             return fileName;
+        }
+
+        // Space-invariant guard that boneTransforms[i] really is selectionData entry i.
+        // The selection positions and the bone Transforms live in different (rigid,
+        // ~uniform-scale) spaces, so absolute coords differ — but the gap between
+        // consecutive entries must agree up to ONE constant scale IF the ordering
+        // matches. A scattered/mismatched order makes those ratios vary wildly. This
+        // only logs (never alters output); it exists so a future MC2 traversal change
+        // can't silently re-scatter the Fixed/Move flags again.
+        static void VerifyBoneAttributeOrder(MagicaCloth cloth, SelectionData bsel, List<Transform> boneTransforms)
+        {
+            int n = boneTransforms.Count;
+            if (bsel.positions == null || bsel.positions.Length != n || n < 3) return;
+            var ratios = new List<float>(n);
+            for (int i = 0; i + 1 < n; i++)
+            {
+                Vector3 ps = (Vector3)bsel.positions[i] - (Vector3)bsel.positions[i + 1];
+                Vector3 pw = boneTransforms[i].position - boneTransforms[i + 1].position;
+                float ds = ps.magnitude, dw = pw.magnitude;
+                if (ds < 1e-6f || dw < 1e-6f) continue;
+                ratios.Add(ds / dw);
+            }
+            if (ratios.Count < 3) return;
+            ratios.Sort();
+            float median = ratios[ratios.Count / 2];
+            if (median < 1e-6f) return;
+            int outliers = 0;
+            foreach (var r in ratios)
+                if (Mathf.Abs(r - median) / median > 0.25f) outliers++;
+            if (outliers > ratios.Count * 0.1f)
+                Debug.LogError($"[HZClothExporter] {cloth.name}: BoneCloth attribute ORDER MISMATCH — " +
+                    $"{outliers}/{ratios.Count} consecutive bone gaps disagree with selectionData order. " +
+                    "Painted Fixed/Move flags would land on the WRONG bones and pin strands. " +
+                    "MC2's bone traversal order likely changed — re-sync boneTransforms with RenderSetupData's walk.");
         }
 
         static string SanitizeName(string n)
