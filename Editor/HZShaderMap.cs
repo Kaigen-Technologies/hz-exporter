@@ -417,6 +417,12 @@ namespace HZExporter
             public int alphaMode = 0;                    // 0 opaque, 1 mask, 2 blend
             public float alphaCutoff = 0.5f;
             public bool doubleSided = false;
+            // non-spec extensions (forked MToon10): Highlight third tone + Face Shading
+            public Color highlightColor = Color.white;   // mtoon_ext.highlightColorFactor (rgb)
+            public float highlightShift = -1f;           // mtoon_ext.highlightShiftFactor
+            public float highlightToony = 0.95f;         // mtoon_ext.highlightToonyFactor
+            public float faceNormalBlend = 0f;           // mtoon_ext.faceShadingNormalBlend
+            public Vector3 faceCenter = Vector3.zero;    // mtoon_ext.faceShadingCenter
         }
 
         /// <summary>Read MToon10 params and embed the MToon-specific textures (shade role 4,
@@ -440,6 +446,11 @@ namespace HZExporter
             if (mat.HasProperty("_AlphaMode")) e.alphaMode = Mathf.RoundToInt(mat.GetFloat("_AlphaMode"));
             if (mat.HasProperty("_Cutoff")) e.alphaCutoff = mat.GetFloat("_Cutoff");
             if (mat.HasProperty("_DoubleSided")) e.doubleSided = mat.GetFloat("_DoubleSided") > 0.5f;
+            if (mat.HasProperty("_HighlightColor")) e.highlightColor = mat.GetColor("_HighlightColor");
+            if (mat.HasProperty("_HighlightShift")) e.highlightShift = mat.GetFloat("_HighlightShift");
+            if (mat.HasProperty("_HighlightToony")) e.highlightToony = mat.GetFloat("_HighlightToony");
+            if (mat.HasProperty("_FaceShadingNormalBlend")) e.faceNormalBlend = mat.GetFloat("_FaceShadingNormalBlend");
+            if (mat.HasProperty("_FaceShadingCenter")) { var c = mat.GetVector("_FaceShadingCenter"); e.faceCenter = new Vector3(c.x, c.y, c.z); }
 
             Texture2D baseTex = (mat.HasProperty("_MainTex") ? mat.GetTexture("_MainTex") : null) as Texture2D;
             if (baseTex == null && mat.HasProperty("_BaseMap")) baseTex = mat.GetTexture("_BaseMap") as Texture2D;

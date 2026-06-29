@@ -1599,8 +1599,13 @@ namespace HZExporter
             json.Append($"          \"parametricRimColorFactor\": [{F(mt.rimColor.r)}, {F(mt.rimColor.g)}, {F(mt.rimColor.b)}],\n");
             json.Append($"          \"parametricRimFresnelPowerFactor\": {F(mt.rimFresnelPower)},\n");
             json.Append($"          \"parametricRimLiftFactor\": {F(mt.rimLift)},\n");
-            json.Append($"          \"rimLightingMixFactor\": {F(mt.rimLightingMix)}");
-            if (rimIdx >= 0) json.Append($",\n          \"rimMultiplyTexture\": {{ \"index\": {rimIdx} }}");
+            json.Append($"          \"rimLightingMixFactor\": {F(mt.rimLightingMix)},\n");
+            // non-spec forked extensions: Highlight third tone + Face Shading.
+            json.Append($"          \"highlightColorFactor\": [{F(mt.highlightColor.r)}, {F(mt.highlightColor.g)}, {F(mt.highlightColor.b)}],\n");
+            json.Append($"          \"highlightShiftFactor\": {F(mt.highlightShift)},\n");
+            json.Append($"          \"highlightToonyFactor\": {F(mt.highlightToony)},\n");
+            json.Append($"          \"faceShadingNormalBlend\": {F(mt.faceNormalBlend)},\n");
+            json.Append($"          \"faceShadingCenter\": [{F(mt.faceCenter.x)}, {F(mt.faceCenter.y)}, {F(mt.faceCenter.z)}]");
             json.Append("\n        }\n      }");
         }
 
