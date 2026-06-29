@@ -255,25 +255,16 @@ namespace HZExporter
             }
         }
 
-        // Read a material color property. HDR color properties come out of Unity in linear, so we
-        // convert them to sRGB (the engine applies srgb->linear, same as it does for light colors,
-        // recovering the authored value). LDR colors are already in the engine's expected space and
-        // pass through unchanged — Unity isn't consistent about which colors it gamma-encodes.
+        // Read a material color property and return it in sRGB (the engine's expected
+        // input — it applies srgb->linear internally, recovering the authored value).
+        // In a Linear-space project Material.GetColor returns the color in LINEAR for
+        // every color property (HDR and LDR alike), so we always re-encode to sRGB.
+        // Writing the raw linear value would make the engine's srgb->linear a second
+        // conversion -> visibly over-saturated colors.
         static Color ReadColor(Material mat, string prop)
         {
             Color c = mat.GetColor(prop);
-            if (IsHdrColorProperty(mat, prop))
-                c = new Color(LinearToSrgbF(c.r), LinearToSrgbF(c.g), LinearToSrgbF(c.b), c.a);
-            return c;
-        }
-
-        static bool IsHdrColorProperty(Material mat, string prop)
-        {
-            var sh = mat != null ? mat.shader : null;
-            if (sh == null) return false;
-            int idx = sh.FindPropertyIndex(prop);
-            if (idx < 0) return false;
-            return (sh.GetPropertyFlags(idx) & UnityEngine.Rendering.ShaderPropertyFlags.HDR) != 0;
+            return new Color(LinearToSrgbF(c.r), LinearToSrgbF(c.g), LinearToSrgbF(c.b), c.a);
         }
 
         static float LinearToSrgbF(float x)
@@ -434,23 +425,27 @@ namespace HZExporter
             var e = new MToonExtras();
             if (mat == null) return e;
 
-            if (mat.HasProperty("_ShadeColor")) e.shadeColor = mat.GetColor("_ShadeColor");
+            // every @color engine prop -> sRGB so the engine's srgb->linear recovers
+            // the authored color (shade/rim/matcap/highlight are all @color now).
+            if (mat.HasProperty("_ShadeColor")) e.shadeColor = ReadColor(mat, "_ShadeColor");
             if (mat.HasProperty("_ShadingShiftFactor")) e.shadingShift = mat.GetFloat("_ShadingShiftFactor");
             if (mat.HasProperty("_ShadingToonyFactor")) e.shadingToony = mat.GetFloat("_ShadingToonyFactor");
             if (mat.HasProperty("_GiEqualization")) e.giEqualization = mat.GetFloat("_GiEqualization");
-            if (mat.HasProperty("_MatcapColor")) e.matcapFactor = mat.GetColor("_MatcapColor");
-            if (mat.HasProperty("_RimColor")) e.rimColor = mat.GetColor("_RimColor");
+            if (mat.HasProperty("_MatcapColor")) e.matcapFactor = ReadColor(mat, "_MatcapColor");
+            if (mat.HasProperty("_RimColor")) e.rimColor = ReadColor(mat, "_RimColor");
             if (mat.HasProperty("_RimFresnelPower")) e.rimFresnelPower = mat.GetFloat("_RimFresnelPower");
             if (mat.HasProperty("_RimLift")) e.rimLift = mat.GetFloat("_RimLift");
             if (mat.HasProperty("_RimLightingMix")) e.rimLightingMix = mat.GetFloat("_RimLightingMix");
             if (mat.HasProperty("_AlphaMode")) e.alphaMode = Mathf.RoundToInt(mat.GetFloat("_AlphaMode"));
             if (mat.HasProperty("_Cutoff")) e.alphaCutoff = mat.GetFloat("_Cutoff");
             if (mat.HasProperty("_DoubleSided")) e.doubleSided = mat.GetFloat("_DoubleSided") > 0.5f;
-            if (mat.HasProperty("_HighlightColor")) e.highlightColor = mat.GetColor("_HighlightColor");
+            if (mat.HasProperty("_HighlightColor")) e.highlightColor = ReadColor(mat, "_HighlightColor");
             if (mat.HasProperty("_HighlightShift")) e.highlightShift = mat.GetFloat("_HighlightShift");
             if (mat.HasProperty("_HighlightToony")) e.highlightToony = mat.GetFloat("_HighlightToony");
             if (mat.HasProperty("_FaceShadingNormalBlend")) e.faceNormalBlend = mat.GetFloat("_FaceShadingNormalBlend");
-            if (mat.HasProperty("_FaceShadingCenter")) { var c = mat.GetVector("_FaceShadingCenter"); e.faceCenter = new Vector3(c.x, c.y, c.z); }
+            // object-space position: must use the SAME axis conversion as the
+            // vertices the engine subtracts it from (HZGlbWriter.MirrorX).
+            if (mat.HasProperty("_FaceShadingCenter")) { var c = mat.GetVector("_FaceShadingCenter"); e.faceCenter = HZGlbWriter.MirrorX(new Vector3(c.x, c.y, c.z)); }
 
             Texture2D baseTex = (mat.HasProperty("_MainTex") ? mat.GetTexture("_MainTex") : null) as Texture2D;
             if (baseTex == null && mat.HasProperty("_BaseMap")) baseTex = mat.GetTexture("_BaseMap") as Texture2D;

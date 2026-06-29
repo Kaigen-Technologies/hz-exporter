@@ -169,7 +169,8 @@ namespace HZExporter
             float[] posMax = { float.MinValue, float.MinValue, float.MinValue };
             for (int i = 0; i < vertexCount; i++)
             {
-                float x = -vertices[i].x, y = vertices[i].y, z = vertices[i].z;
+                Vector3 g = MirrorX(vertices[i]);
+                float x = g.x, y = g.y, z = g.z;
                 WriteF32(bin, x); WriteF32(bin, y); WriteF32(bin, z);
                 posMin[0] = Math.Min(posMin[0], x); posMin[1] = Math.Min(posMin[1], y); posMin[2] = Math.Min(posMin[2], z);
                 posMax[0] = Math.Max(posMax[0], x); posMax[1] = Math.Max(posMax[1], y); posMax[2] = Math.Max(posMax[2], z);
@@ -180,10 +181,8 @@ namespace HZExporter
             int normOffset = (int)bin.Position;
             for (int i = 0; i < vertexCount; i++)
             {
-                float x = (i < normals.Length) ? -normals[i].x : 0;
-                float y = (i < normals.Length) ? normals[i].y : 0;
-                float z = (i < normals.Length) ? normals[i].z : 1;
-                WriteF32(bin, x); WriteF32(bin, y); WriteF32(bin, z);
+                Vector3 nrm = (i < normals.Length) ? MirrorX(normals[i]) : new Vector3(0, 0, 1);
+                WriteF32(bin, nrm.x); WriteF32(bin, nrm.y); WriteF32(bin, nrm.z);
             }
             int normSize = (int)bin.Position - normOffset;
 
@@ -194,11 +193,8 @@ namespace HZExporter
             {
                 for (int i = 0; i < vertexCount; i++)
                 {
-                    float x = (i < tangents.Length) ? -tangents[i].x : 1;
-                    float y = (i < tangents.Length) ? tangents[i].y : 0;
-                    float z = (i < tangents.Length) ? tangents[i].z : 0;
-                    float w = (i < tangents.Length) ? tangents[i].w : 1;
-                    WriteF32(bin, x); WriteF32(bin, y); WriteF32(bin, z); WriteF32(bin, w);
+                    Vector4 t = (i < tangents.Length) ? MirrorX(tangents[i]) : new Vector4(1, 0, 0, 1);
+                    WriteF32(bin, t.x); WriteF32(bin, t.y); WriteF32(bin, t.z); WriteF32(bin, t.w);
                 }
             }
             int tanSize = (int)bin.Position - tanOffset;
@@ -829,8 +825,8 @@ namespace HZExporter
                 float[] posMax = { float.MinValue, float.MinValue, float.MinValue };
                 for (int i = 0; i < vertexCount; i++)
                 {
-                    Vector3 p = preXform.MultiplyPoint3x4(vertices[i]);
-                    float x = -p.x, y = p.y, z = p.z;
+                    Vector3 g = MirrorX(preXform.MultiplyPoint3x4(vertices[i]));
+                    float x = g.x, y = g.y, z = g.z;
                     WriteF32(bin, x); WriteF32(bin, y); WriteF32(bin, z);
                     posMin[0] = Math.Min(posMin[0], x); posMin[1] = Math.Min(posMin[1], y); posMin[2] = Math.Min(posMin[2], z);
                     posMax[0] = Math.Max(posMax[0], x); posMax[1] = Math.Max(posMax[1], y); posMax[2] = Math.Max(posMax[2], z);
@@ -844,7 +840,8 @@ namespace HZExporter
                     Vector3 n = (i < normals.Length)
                         ? preXformNormal.MultiplyVector(normals[i]).normalized
                         : new Vector3(0, 0, 1);
-                    float nx = -n.x, ny = n.y, nz = n.z;
+                    Vector3 ng = MirrorX(n);
+                    float nx = ng.x, ny = ng.y, nz = ng.z;
                     WriteF32(bin, nx); WriteF32(bin, ny); WriteF32(bin, nz);
                 }
                 int normSize = (int)bin.Position - normOff;
@@ -856,8 +853,8 @@ namespace HZExporter
                     for (int i = 0; i < vertexCount; i++)
                     {
                         Vector4 t4 = (i < tangents.Length) ? tangents[i] : new Vector4(1, 0, 0, 1);
-                        Vector3 td = preXformNormal.MultiplyVector(new Vector3(t4.x, t4.y, t4.z)).normalized;
-                        WriteF32(bin, -td.x);
+                        Vector3 td = MirrorX(preXformNormal.MultiplyVector(new Vector3(t4.x, t4.y, t4.z)).normalized);
+                        WriteF32(bin, td.x);
                         WriteF32(bin, td.y);
                         WriteF32(bin, td.z);
                         WriteF32(bin, t4.w);
@@ -978,8 +975,8 @@ namespace HZExporter
                         float[] dpMax = { float.MinValue, float.MinValue, float.MinValue };
                         for (int i = 0; i < vertexCount; i++)
                         {
-                            Vector3 p = preXform.MultiplyVector(dV[i]);
-                            float x = -p.x, y = p.y, z = p.z;
+                            Vector3 g = MirrorX(preXform.MultiplyVector(dV[i]));
+                            float x = g.x, y = g.y, z = g.z;
                             WriteF32(bin, x); WriteF32(bin, y); WriteF32(bin, z);
                             dpMin[0] = Math.Min(dpMin[0], x); dpMin[1] = Math.Min(dpMin[1], y); dpMin[2] = Math.Min(dpMin[2], z);
                             dpMax[0] = Math.Max(dpMax[0], x); dpMax[1] = Math.Max(dpMax[1], y); dpMax[2] = Math.Max(dpMax[2], z);
@@ -990,8 +987,8 @@ namespace HZExporter
                         int dnOff = (int)bin.Position;
                         for (int i = 0; i < vertexCount; i++)
                         {
-                            Vector3 n = preXformNormal.MultiplyVector(dN[i]);
-                            WriteF32(bin, -n.x); WriteF32(bin, n.y); WriteF32(bin, n.z);
+                            Vector3 n = MirrorX(preXformNormal.MultiplyVector(dN[i]));
+                            WriteF32(bin, n.x); WriteF32(bin, n.y); WriteF32(bin, n.z);
                         }
                         int dnBV = AddBV(dnOff, (int)bin.Position - dnOff, 12);
                         bsNormAcc[b] = AddAcc(dnBV, FLOAT, vertexCount, "VEC3");
@@ -1017,16 +1014,11 @@ namespace HZExporter
             int ibmOff = (int)bin.Position;
             for (int i = 0; i < jointCount; i++)
             {
-                // Convert bind pose: negate X row and X column
-                var m = bindPoses[i];
+                // bind pose is an object-space transform -> mirror across X.
+                var m = MirrorX(bindPoses[i]);
                 for (int col = 0; col < 4; col++)
                     for (int row = 0; row < 4; row++)
-                    {
-                        float v = m[row, col];
-                        bool negRow = (row == 0), negCol = (col == 0);
-                        if (negRow != negCol) v = -v;
-                        WriteF32(bin, v);
-                    }
+                        WriteF32(bin, m[row, col]);
             }
             int ibmSize = (int)bin.Position - ibmOff;
             int ibmBV = AddBV(ibmOff, ibmSize);
@@ -1187,8 +1179,8 @@ namespace HZExporter
                         int tOff = (int)bin.Position;
                         for (int ki = 0; ki < keyframeCount; ki++)
                         {
-                            var p = sampledT[ki][bi];
-                            WriteF32(bin, -p.x); WriteF32(bin, p.y); WriteF32(bin, p.z);
+                            Vector3 g = MirrorX(sampledT[ki][bi]);
+                            WriteF32(bin, g.x); WriteF32(bin, g.y); WriteF32(bin, g.z);
                         }
                         int tBV = AddBV(tOff, keyframeCount * 12);
                         int tAcc2 = AddAcc(tBV, FLOAT, keyframeCount, "VEC3");
@@ -1198,8 +1190,8 @@ namespace HZExporter
                         int rOff = (int)bin.Position;
                         for (int ki = 0; ki < keyframeCount; ki++)
                         {
-                            var q = sampledR[ki][bi];
-                            WriteF32(bin, q.x); WriteF32(bin, -q.y); WriteF32(bin, -q.z); WriteF32(bin, q.w);
+                            var q = MirrorX(sampledR[ki][bi]);
+                            WriteF32(bin, q.x); WriteF32(bin, q.y); WriteF32(bin, q.z); WriteF32(bin, q.w);
                         }
                         int rBV = AddBV(rOff, keyframeCount * 16);
                         int rAcc2 = AddAcc(rBV, FLOAT, keyframeCount, "VEC4");
@@ -1427,8 +1419,10 @@ namespace HZExporter
                 var lp = restPositions[i];
                 var lr = restRotations[i];
                 var ls = restScales[i];
-                float px = -lp.x, py = lp.y, pz = lp.z;
-                float qx = lr.x, qy = -lr.y, qz = -lr.z, qw = lr.w;
+                Vector3 p = MirrorX(lp);
+                Quaternion q = MirrorX(lr);
+                float px = p.x, py = p.y, pz = p.z;
+                float qx = q.x, qy = q.y, qz = q.z, qw = q.w;
 
                 string nodeName = bone != null ? bone.name : $"__null_bone_{i}";
                 json.Append($"    {{ \"name\": \"{EscapeJson(nodeName)}\"");
@@ -1730,6 +1724,28 @@ namespace HZExporter
         static void WriteU16(MemoryStream s, ushort v) { s.WriteByte((byte)(v & 0xFF)); s.WriteByte((byte)(v >> 8)); }
         static void WriteU32(MemoryStream s, uint v) { var b = BitConverter.GetBytes(v); s.Write(b, 0, 4); }
         static void WriteF32(MemoryStream s, float v) { var b = BitConverter.GetBytes(v); s.Write(b, 0, 4); }
+
+        /// <summary>Single source of truth for the Unity(LH, +Z forward) -> glTF(RH)
+        /// axis conversion: a mirror across X. EVERY object-space position and
+        /// direction written to the glb must pass through this. The engine subtracts
+        /// the MToon face-shading center from these converted vertices, so the center
+        /// has to use the same mirror — route any new object-space field through here
+        /// rather than re-inlining `-v.x`.</summary>
+        public static Vector3 MirrorX(Vector3 v) => new Vector3(-v.x, v.y, v.z);
+        // tangent: direction in xyz (mirrored), handedness sign in w (unchanged).
+        public static Vector4 MirrorX(Vector4 t) => new Vector4(-t.x, t.y, t.z, t.w);
+        // rotation under an X mirror: negate the y/z imaginary parts.
+        public static Quaternion MirrorX(Quaternion q) => new Quaternion(q.x, -q.y, -q.z, q.w);
+        // a transform under an X mirror is the conjugation S*M*S with S=diag(-1,1,1,1):
+        // negate exactly the entries whose row or column (xor) is the X axis.
+        public static Matrix4x4 MirrorX(Matrix4x4 m)
+        {
+            var r = m;
+            for (int col = 0; col < 4; col++)
+                for (int row = 0; row < 4; row++)
+                    if ((row == 0) != (col == 0)) r[row, col] = -m[row, col];
+            return r;
+        }
 
         internal static void PadTo4(MemoryStream s)
         {
