@@ -255,16 +255,26 @@ namespace HZExporter
             }
         }
 
-        // Read a material color property and return it in sRGB (the engine's expected
-        // input — it applies srgb->linear internally, recovering the authored value).
-        // In a Linear-space project Material.GetColor returns the color in LINEAR for
-        // every color property (HDR and LDR alike), so we always re-encode to sRGB.
-        // Writing the raw linear value would make the engine's srgb->linear a second
-        // conversion -> visibly over-saturated colors.
+        // Read a material color property in the engine's expected space (sRGB — it
+        // applies srgb->linear internally). Material.GetColor returns LDR Color props
+        // already in sRGB (the inspector/gamma value), so those pass through. HDR
+        // color props come out of Unity in LINEAR, so re-encode those to sRGB. (Unity
+        // is not consistent about which colors it gamma-encodes.)
         static Color ReadColor(Material mat, string prop)
         {
             Color c = mat.GetColor(prop);
-            return new Color(LinearToSrgbF(c.r), LinearToSrgbF(c.g), LinearToSrgbF(c.b), c.a);
+            if (IsHdrColorProperty(mat, prop))
+                c = new Color(LinearToSrgbF(c.r), LinearToSrgbF(c.g), LinearToSrgbF(c.b), c.a);
+            return c;
+        }
+
+        static bool IsHdrColorProperty(Material mat, string prop)
+        {
+            var sh = mat != null ? mat.shader : null;
+            if (sh == null) return false;
+            int idx = sh.FindPropertyIndex(prop);
+            if (idx < 0) return false;
+            return (sh.GetPropertyFlags(idx) & UnityEngine.Rendering.ShaderPropertyFlags.HDR) != 0;
         }
 
         static float LinearToSrgbF(float x)
@@ -414,6 +424,11 @@ namespace HZExporter
             public float highlightToony = 0.95f;         // mtoon_ext.highlightToonyFactor
             public float faceNormalBlend = 0f;           // mtoon_ext.faceShadingNormalBlend
             public Vector3 faceCenter = Vector3.zero;    // mtoon_ext.faceShadingCenter
+            // outline (VRM mtoon spec)
+            public Color outlineColor = Color.black;     // outlineColorFactor (rgb)
+            public float outlineWidth = 0f;              // outlineWidthFactor
+            public int outlineMode = 0;                  // outlineWidthMode: 0 none, 1 world, 2 screen
+            public float outlineLightingMix = 1f;        // outlineLightingMixFactor
         }
 
         /// <summary>Read MToon10 params and embed the MToon-specific textures (shade role 4,
@@ -443,6 +458,10 @@ namespace HZExporter
             if (mat.HasProperty("_HighlightShift")) e.highlightShift = mat.GetFloat("_HighlightShift");
             if (mat.HasProperty("_HighlightToony")) e.highlightToony = mat.GetFloat("_HighlightToony");
             if (mat.HasProperty("_FaceShadingNormalBlend")) e.faceNormalBlend = mat.GetFloat("_FaceShadingNormalBlend");
+            if (mat.HasProperty("_OutlineColor")) e.outlineColor = ReadColor(mat, "_OutlineColor");
+            if (mat.HasProperty("_OutlineWidth")) e.outlineWidth = mat.GetFloat("_OutlineWidth");
+            if (mat.HasProperty("_OutlineWidthMode")) e.outlineMode = Mathf.RoundToInt(mat.GetFloat("_OutlineWidthMode"));
+            if (mat.HasProperty("_OutlineLightingMix")) e.outlineLightingMix = mat.GetFloat("_OutlineLightingMix");
             // object-space position: must use the SAME axis conversion as the
             // vertices the engine subtracts it from (HZGlbWriter.MirrorX).
             if (mat.HasProperty("_FaceShadingCenter")) { var c = mat.GetVector("_FaceShadingCenter"); e.faceCenter = HZGlbWriter.MirrorX(new Vector3(c.x, c.y, c.z)); }

@@ -1599,7 +1599,12 @@ namespace HZExporter
             json.Append($"          \"highlightShiftFactor\": {F(mt.highlightShift)},\n");
             json.Append($"          \"highlightToonyFactor\": {F(mt.highlightToony)},\n");
             json.Append($"          \"faceShadingNormalBlend\": {F(mt.faceNormalBlend)},\n");
-            json.Append($"          \"faceShadingCenter\": [{F(mt.faceCenter.x)}, {F(mt.faceCenter.y)}, {F(mt.faceCenter.z)}]");
+            json.Append($"          \"faceShadingCenter\": [{F(mt.faceCenter.x)}, {F(mt.faceCenter.y)}, {F(mt.faceCenter.z)}],\n");
+            string owm = mt.outlineMode == 2 ? "screenCoordinates" : mt.outlineMode == 1 ? "worldCoordinates" : "none";
+            json.Append($"          \"outlineWidthMode\": \"{owm}\",\n");
+            json.Append($"          \"outlineWidthFactor\": {F(mt.outlineWidth)},\n");
+            json.Append($"          \"outlineColorFactor\": [{F(mt.outlineColor.r)}, {F(mt.outlineColor.g)}, {F(mt.outlineColor.b)}],\n");
+            json.Append($"          \"outlineLightingMixFactor\": {F(mt.outlineLightingMix)}");
             json.Append("\n        }\n      }");
         }
 
