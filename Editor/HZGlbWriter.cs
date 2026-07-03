@@ -751,6 +751,10 @@ namespace HZExporter
             int[][] morphPosAccs = new int[meshCount][];
             int[][] morphNormAccs = new int[meshCount][];
             string[][] morphNames = new string[meshCount][];
+            // A zero VEC3 accessor per SMR (that vertexCount), used to pad union targets an SMR lacks
+            // when several blendshaped SMRs are merged into one mesh. -1 = no morphs on this SMR.
+            int[] zeroMorphAccs = new int[meshCount];
+            for (int mi = 0; mi < meshCount; mi++) zeroMorphAccs[mi] = -1;
 
             for (int mi = 0; mi < meshCount; mi++)
             {
@@ -997,6 +1001,18 @@ namespace HZExporter
                 morphPosAccs[mi] = bsPosAcc;
                 morphNormAccs[mi] = bsNormAcc;
                 morphNames[mi] = bsNames;
+
+                // Zero VEC3 delta accessor for this SMR: used to pad the merged mesh's union targets
+                // that this SMR doesn't have (so applying e.g. Fcl_MTH_A moves nothing on the eye mesh
+                // rather than reusing a wrong delta). One accessor, referenced by every missing target.
+                if (bsCount > 0)
+                {
+                    int zOff = (int)bin.Position;
+                    for (int i = 0; i < vertexCount * 3; i++) WriteF32(bin, 0f);
+                    int zBV = AddBV(zOff, (int)bin.Position - zOff, 12);
+                    zeroMorphAccs[mi] = AddAcc(zBV, FLOAT, vertexCount, "VEC3",
+                                               new float[] { 0, 0, 0 }, new float[] { 0, 0, 0 });
+                }
 
                 int[] subAccs = new int[submeshCount];
                 for (int s = 0; s < submeshCount; s++)
@@ -1336,20 +1352,54 @@ namespace HZExporter
             }
             json.Append("\n  ],\n");
 
-            // Group SMRs that carry the SAME (ordered, prefix-stripped) blendshape set into ONE
-            // glTF mesh with multiple primitives — a blendshape set is per-mesh in the engine, but
-            // the FBX often splits one blendshaped mesh into several SMRs. Non-blendshape SMRs and
-            // distinct sets stay separate. Key = "|"-joined target names ("" = no blendshapes →
-            // each its own singleton group).
-            var groups = new List<List<int>>();
-            var keyToGroup = new Dictionary<string, int>();
+            // Merge SMRs whose blendshape sets OVERLAP (share any shape name) into one glTF mesh. This
+            // pulls the face's several SMRs together — they share the Fcl_* shapes — without touching
+            // the body / skirt(cloth) / hair meshes, whose incidental blendshapes (Small_hands, Fix_*,
+            // Hair002) are disjoint and must stay separate for cloth, camera-follow, etc. The old code
+            // required an IDENTICAL set, which stopped merging the face once its SMRs carried different
+            // subsets. The merged mesh's target list is the UNION of its members' shapes; each
+            // primitive is zero-padded for the shapes it lacks (glTF requires all primitives to share
+            // the same targets in the same order). Union-find over shared shape names.
+            int[] uf = new int[meshCount];
+            for (int i = 0; i < meshCount; i++) uf[i] = i;
+            var nameOwner = new Dictionary<string, int>();
             for (int mi = 0; mi < meshCount; mi++)
             {
                 var nm = morphNames[mi];
-                string key = (nm != null && nm.Length > 0) ? string.Join("|", nm) : null;
-                if (key == null) { groups.Add(new List<int> { mi }); continue; }
-                if (keyToGroup.TryGetValue(key, out int gi)) groups[gi].Add(mi);
-                else { keyToGroup[key] = groups.Count; groups.Add(new List<int> { mi }); }
+                if (nm == null || nm.Length == 0) continue;
+                foreach (var n in nm)
+                {
+                    if (nameOwner.TryGetValue(n, out int other))
+                    {
+                        int ra = mi; while (uf[ra] != ra) ra = uf[ra];
+                        int rb = other; while (uf[rb] != rb) rb = uf[rb];
+                        if (ra != rb) uf[ra] = rb;
+                    }
+                    else nameOwner[n] = mi;
+                }
+            }
+            var groups = new List<List<int>>();
+            var rootToGroup = new Dictionary<int, int>();
+            for (int mi = 0; mi < meshCount; mi++)
+            {
+                int r = mi; while (uf[r] != r) r = uf[r];
+                if (rootToGroup.TryGetValue(r, out int gi)) groups[gi].Add(mi);
+                else { rootToGroup[r] = groups.Count; groups.Add(new List<int> { mi }); }
+            }
+
+            // Per-group union of target names (first-seen order across the group's SMRs).
+            var groupNames = new List<string[]>();
+            foreach (var grp in groups)
+            {
+                var union = new List<string>();
+                var seen = new HashSet<string>();
+                foreach (int mi in grp)
+                {
+                    var nm = morphNames[mi];
+                    if (nm == null) continue;
+                    foreach (var n in nm) if (seen.Add(n)) union.Add(n);
+                }
+                groupNames.Add(union.Count > 0 ? union.ToArray() : null);
             }
 
             // Meshes — one per group; primitives are every grouped SMR's submeshes. Each primitive
@@ -1360,7 +1410,7 @@ namespace HZExporter
             {
                 if (g > 0) json.Append(",\n");
                 var group = groups[g];
-                string[] gNames = morphNames[group[0]];
+                string[] gNames = groupNames[g];        // UNION of the group's target names
                 int bsN = gNames != null ? gNames.Length : 0;
                 string meshName = smrs[group[0]].sharedMesh.name ?? $"mesh_{g}";
 
@@ -1372,14 +1422,22 @@ namespace HZExporter
                     int[] subAccs = submeshIndicesAccs[mi];
                     int[] matRow = matIndexPerSmr[mi];
                     int[] mPos = morphPosAccs[mi]; int[] mNorm = morphNormAccs[mi];
+                    string[] mNames = morphNames[mi];
                     string targetsJson = "";
                     if (bsN > 0)
                     {
                         var tb = new StringBuilder(", \"targets\": [");
                         for (int b = 0; b < bsN; b++)
                         {
+                            // map union target b to this SMR's local shape by NAME, or a zero delta.
+                            int local = -1;
+                            if (mNames != null)
+                                for (int k = 0; k < mNames.Length; k++)
+                                    if (mNames[k] == gNames[b]) { local = k; break; }
+                            int posA = (local >= 0) ? mPos[local] : zeroMorphAccs[mi];
+                            int normA = (local >= 0) ? mNorm[local] : zeroMorphAccs[mi];
                             if (b > 0) tb.Append(", ");
-                            tb.Append($"{{ \"POSITION\": {mPos[b]}, \"NORMAL\": {mNorm[b]} }}");
+                            tb.Append($"{{ \"POSITION\": {posA}, \"NORMAL\": {normA} }}");
                         }
                         tb.Append("]");
                         targetsJson = tb.ToString();

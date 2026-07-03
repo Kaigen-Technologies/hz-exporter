@@ -895,6 +895,14 @@ public static class HZExportCommands
     }
 
     [MenuItem("Hz Exporter/Export Active Scene")]
+    public static void ExportMutualsTest()
+    {
+        UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+            "Assets/Mutuals/mutuals_test.unity",
+            UnityEditor.SceneManagement.OpenSceneMode.Single);
+        ExportScene();
+    }
+
     public static void ExportScene()
     {
         // Clear the per-export PNG cache so we don't leak texture bytes across runs.
