@@ -422,6 +422,8 @@ namespace HZExporter
             public Color highlightColor = Color.white;   // mtoon_ext.highlightColorFactor (rgb)
             public float highlightShift = -1f;           // mtoon_ext.highlightShiftFactor
             public float highlightToony = 0.95f;         // mtoon_ext.highlightToonyFactor
+            public float highlightEnabled = 0f;          // mtoon_ext.highlightEnabledFactor
+            public float highlightUseTexture = 0f;       // mtoon_ext.highlightUseTexture
             public float faceNormalBlend = 0f;           // mtoon_ext.faceShadingNormalBlend
             public Vector3 faceCenter = Vector3.zero;    // mtoon_ext.faceShadingCenter
             // outline (VRM mtoon spec)
@@ -429,6 +431,13 @@ namespace HZExporter
             public float outlineWidth = 0f;              // outlineWidthFactor
             public int outlineMode = 0;                  // outlineWidthMode: 0 none, 1 world, 2 screen
             public float outlineLightingMix = 1f;        // outlineLightingMixFactor
+            // non-spec extensions (forked MToon10): Blush and Nervous tints
+            public Color blushTint = Color.white;        // mtoon_ext.blushTintFactor (rgb)
+            public Color nervousTint = Color.white;      // mtoon_ext.nervousTintFactor (rgb)
+            public float blushValue = 0f;                // mtoon_ext.blushValueFactor
+            public float nervousValue = 0f;               // mtoon_ext.nervousValueFactor
+            public float rimVertexColorMask = 0f;         // mtoon_ext.rimVertexColorMaskEnabled
+            public float outlineVertexColorMask = 0f;     // mtoon_ext.outlineVertexColorMaskEnabled
         }
 
         /// <summary>Read MToon10 params and embed the MToon-specific textures (shade role 4,
@@ -457,11 +466,19 @@ namespace HZExporter
             if (mat.HasProperty("_HighlightColor")) e.highlightColor = ReadColor(mat, "_HighlightColor");
             if (mat.HasProperty("_HighlightShift")) e.highlightShift = mat.GetFloat("_HighlightShift");
             if (mat.HasProperty("_HighlightToony")) e.highlightToony = mat.GetFloat("_HighlightToony");
+            if (mat.HasProperty("_HighlightEnabled")) e.highlightEnabled = mat.GetFloat("_HighlightEnabled");
+            if (mat.HasProperty("_HighlightUseTexture")) e.highlightUseTexture = mat.GetFloat("_HighlightUseTexture");
             if (mat.HasProperty("_FaceShadingNormalBlend")) e.faceNormalBlend = mat.GetFloat("_FaceShadingNormalBlend");
             if (mat.HasProperty("_OutlineColor")) e.outlineColor = ReadColor(mat, "_OutlineColor");
             if (mat.HasProperty("_OutlineWidth")) e.outlineWidth = mat.GetFloat("_OutlineWidth");
             if (mat.HasProperty("_OutlineWidthMode")) e.outlineMode = Mathf.RoundToInt(mat.GetFloat("_OutlineWidthMode"));
             if (mat.HasProperty("_OutlineLightingMix")) e.outlineLightingMix = mat.GetFloat("_OutlineLightingMix");
+            if (mat.HasProperty("_BlushTint")) e.blushTint = ReadColor(mat, "_BlushTint");
+            if (mat.HasProperty("_NervousTint")) e.nervousTint = ReadColor(mat, "_NervousTint");
+            if (mat.HasProperty("_BlushValue")) e.blushValue = mat.GetFloat("_BlushValue");
+            if (mat.HasProperty("_NervousValue")) e.nervousValue = mat.GetFloat("_NervousValue");
+            if (mat.HasProperty("_RimVertexColorMask")) e.rimVertexColorMask = mat.GetFloat("_RimVertexColorMask");
+            if (mat.HasProperty("_OutlineVertexColorMask")) e.outlineVertexColorMask = mat.GetFloat("_OutlineVertexColorMask");
             // object-space position: must use the SAME axis conversion as the
             // vertices the engine subtracts it from (HZGlbWriter.MirrorX).
             if (mat.HasProperty("_FaceShadingCenter")) { var c = mat.GetVector("_FaceShadingCenter"); e.faceCenter = HZGlbWriter.MirrorX(new Vector3(c.x, c.y, c.z)); }
@@ -479,6 +496,12 @@ namespace HZExporter
             if (matcapTex != null) EmbedRoleTexture(matcapTex, false, 5, bin, onImage);
             var rimTex = (mat.HasProperty("_RimTex") ? mat.GetTexture("_RimTex") : null) as Texture2D;
             if (rimTex != null) EmbedRoleTexture(rimTex, false, 6, bin, onImage);
+            var highlightTex = (mat.HasProperty("_HighlightTex") ? mat.GetTexture("_HighlightTex") : null) as Texture2D;
+            if (highlightTex != null) EmbedRoleTexture(highlightTex, false, 7, bin, onImage);
+            var blushTex = (mat.HasProperty("_BlushMask") ? mat.GetTexture("_BlushMask") : null) as Texture2D;
+            if (blushTex != null) EmbedRoleTexture(blushTex, false, 8, bin, onImage);
+            var nervousTex = (mat.HasProperty("_NervousMask") ? mat.GetTexture("_NervousMask") : null) as Texture2D;
+            if (nervousTex != null) EmbedRoleTexture(nervousTex, false, 9, bin, onImage);
 
             return e;
         }

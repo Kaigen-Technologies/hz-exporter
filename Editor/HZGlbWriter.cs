@@ -469,9 +469,9 @@ namespace HZExporter
             for (int ii = 0; ii < imageEntries.Count; ii++)
             {
                 int mi = imageEntries[ii].matIdx;
-                if (!matTexMap.ContainsKey(mi)) matTexMap[mi] = new int[] { -1, -1, -1, -1, -1, -1, -1 };
+                if (!matTexMap.ContainsKey(mi)) matTexMap[mi] = new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
                 int role = imageEntries[ii].role;
-                if (role >= 0 && role < 7) matTexMap[mi][role] = ii;
+                if (role >= 0 && role < 10) matTexMap[mi][role] = ii;
             }
 
             // Materials — factors + slotted texture refs (from HZShaderMap).
@@ -491,7 +491,7 @@ namespace HZExporter
                 else
                 {
                     var f = matFactors[mi];
-                    int[] ti = matTexMap.ContainsKey(mi) ? matTexMap[mi] : new int[] { -1, -1, -1, -1, -1, -1, -1 };
+                    int[] ti = matTexMap.ContainsKey(mi) ? matTexMap[mi] : new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
                     json.Append($"    {{\n      \"name\": \"{EscapeJson(matName)}\",\n      \"pbrMetallicRoughness\": {{\n");
                     json.Append($"        \"baseColorFactor\": [{F(f.baseColor.r)}, {F(f.baseColor.g)}, {F(f.baseColor.b)}, {F(f.baseColor.a)}]");
                     if (ti[0] >= 0) json.Append($",\n        \"baseColorTexture\": {{ \"index\": {ti[0]} }}");
@@ -1312,9 +1312,9 @@ namespace HZExporter
             for (int i = 0; i < skinnedImageEntries.Count; i++)
             {
                 int mi2 = skinnedImageEntries[i].matIdx;
-                if (!matTexMap.ContainsKey(mi2)) matTexMap[mi2] = new int[] { -1, -1, -1, -1, -1, -1, -1 };
+                if (!matTexMap.ContainsKey(mi2)) matTexMap[mi2] = new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
                 int r = skinnedImageEntries[i].role;
-                if (r >= 0 && r < 7) matTexMap[mi2][r] = i;
+                if (r >= 0 && r < 10) matTexMap[mi2][r] = i;
             }
 
             json.Append("  \"materials\": [\n");
@@ -1331,7 +1331,7 @@ namespace HZExporter
                 else
                 {
                     var f = skinnedFactors[mi2];
-                    int[] ti = matTexMap.ContainsKey(mi2) ? matTexMap[mi2] : new int[] { -1, -1, -1, -1, -1, -1, -1 };
+                    int[] ti = matTexMap.ContainsKey(mi2) ? matTexMap[mi2] : new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
                     json.Append($"    {{\n      \"name\": \"{EscapeJson(smatName)}\",\n      \"pbrMetallicRoughness\": {{\n");
                     json.Append($"        \"baseColorFactor\": [{F(f.baseColor.r)}, {F(f.baseColor.g)}, {F(f.baseColor.b)}, {F(f.baseColor.a)}]");
@@ -1628,7 +1628,7 @@ namespace HZExporter
 
         // Append alphaMode/alphaCutoff + the VRMC_materials_mtoon extension onto an
         // already-open standard glTF material (the engine's vrm_mtoon cook reads these).
-        // ti = per-material texture indices [albedo, normal, orm, emissive, shade, matcap, rim].
+        // ti = per-material texture indices [albedo, normal, orm, emissive, shade, matcap, rim, highlight].
         static void AppendMToonExtension(StringBuilder json, HZShaderMap.MToonExtras mt, int[] ti)
         {
             string am = mt.alphaMode == 2 ? "BLEND" : mt.alphaMode == 1 ? "MASK" : "OPAQUE";
@@ -1638,6 +1638,9 @@ namespace HZExporter
             int shadeIdx = mt.shadeUsesAlbedo ? ti[0] : ti[4];
             int matcapIdx = ti[5];
             int rimIdx = ti[6];
+            int highlightIdx = ti[7];
+            int blushIdx = ti[8];
+            int nervousIdx = ti[9];
 
             json.Append(",\n      \"extensions\": {\n        \"VRMC_materials_mtoon\": {\n");
             json.Append("          \"specVersion\": \"1.0\",\n");
@@ -1652,10 +1655,21 @@ namespace HZExporter
             json.Append($"          \"parametricRimFresnelPowerFactor\": {F(mt.rimFresnelPower)},\n");
             json.Append($"          \"parametricRimLiftFactor\": {F(mt.rimLift)},\n");
             json.Append($"          \"rimLightingMixFactor\": {F(mt.rimLightingMix)},\n");
+            json.Append($"          \"rimVertexColorMaskEnabled\": {F(mt.rimVertexColorMask)},\n");
+            json.Append($"          \"outlineVertexColorMaskEnabled\": {F(mt.outlineVertexColorMask)},\n");
             // non-spec forked extensions: Highlight third tone + Face Shading.
             json.Append($"          \"highlightColorFactor\": [{F(mt.highlightColor.r)}, {F(mt.highlightColor.g)}, {F(mt.highlightColor.b)}],\n");
             json.Append($"          \"highlightShiftFactor\": {F(mt.highlightShift)},\n");
             json.Append($"          \"highlightToonyFactor\": {F(mt.highlightToony)},\n");
+            json.Append($"          \"highlightEnabledFactor\": {F(mt.highlightEnabled)},\n");
+            json.Append($"          \"highlightUseTexture\": {F(mt.highlightUseTexture)},\n");
+            if (highlightIdx >= 0) json.Append($"          \"highlightMultiplyTexture\": {{ \"index\": {highlightIdx} }},\n");
+            json.Append($"          \"blushTintFactor\": [{F(mt.blushTint.r)}, {F(mt.blushTint.g)}, {F(mt.blushTint.b)}],\n");
+            json.Append($"          \"blushValueFactor\": {F(mt.blushValue)},\n");
+            if (blushIdx >= 0) json.Append($"          \"blushMultiplyTexture\": {{ \"index\": {blushIdx} }},\n");
+            json.Append($"          \"nervousTintFactor\": [{F(mt.nervousTint.r)}, {F(mt.nervousTint.g)}, {F(mt.nervousTint.b)}],\n");
+            json.Append($"          \"nervousValueFactor\": {F(mt.nervousValue)},\n");
+            if (nervousIdx >= 0) json.Append($"          \"nervousMultiplyTexture\": {{ \"index\": {nervousIdx} }},\n");
             json.Append($"          \"faceShadingNormalBlend\": {F(mt.faceNormalBlend)},\n");
             json.Append($"          \"faceShadingCenter\": [{F(mt.faceCenter.x)}, {F(mt.faceCenter.y)}, {F(mt.faceCenter.z)}],\n");
             string owm = mt.outlineMode == 2 ? "screenCoordinates" : mt.outlineMode == 1 ? "worldCoordinates" : "none";
