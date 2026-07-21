@@ -658,6 +658,53 @@ namespace HZExporter
                 parentIndices[i] = (parent != null && boneToIndex.TryGetValue(parent, out int pi)) ? pi : -1;
             }
 
+            // Union in bones referenced by OTHER SMRs but absent from primarySmr's
+            // skeleton (e.g. prop meshes — floating hearts, heart-eyes, angry-mouth
+            // geo — bound to their own dedicated bones). Without this, those bones
+            // would fall through the boneRemap fallback below and collapse to joint
+            // 0 (root), skinning the prop verts to the wrong place. Bones a prop SMR
+            // shares with the primary skeleton are left alone here — they already
+            // have an index via boneToIndex and are handled by the existing
+            // preXform pre-transform path (per-SMR bindpose divergence) below, not
+            // by this append. Added AFTER the primary skin joints so existing joint
+            // indices (weights, anim channels) are unchanged.
+            {
+                var boneList = new List<Transform>(bones);
+                var bindList = new List<Matrix4x4>();
+                for (int i = 0; i < jointCount; i++)
+                    bindList.Add(i < bindPoses.Length ? bindPoses[i] : Matrix4x4.identity);
+                int origJointCount = jointCount;
+                foreach (var s in smrs)
+                {
+                    if (s == primarySmr || s.bones == null || s.sharedMesh == null) continue;
+                    var sBones = s.bones;
+                    var sBindPoses = s.sharedMesh.bindposes;
+                    for (int bi = 0; bi < sBones.Length; bi++)
+                    {
+                        var b = sBones[bi];
+                        if (b == null || boneToIndex.ContainsKey(b)) continue;
+                        int idx = boneList.Count;
+                        boneToIndex[b] = idx;
+                        boneList.Add(b);
+                        bindList.Add(bi < sBindPoses.Length ? sBindPoses[bi] : Matrix4x4.identity);
+                    }
+                }
+                if (boneList.Count > origJointCount)
+                {
+                    bones = boneList.ToArray();
+                    bindPoses = bindList.ToArray();
+                    jointCount = bones.Length;
+                    parentIndices = new int[jointCount];
+                    for (int i = 0; i < jointCount; i++)
+                    {
+                        if (bones[i] == null) { parentIndices[i] = -1; continue; }
+                        var p = bones[i].parent;
+                        parentIndices[i] = (p != null && boneToIndex.TryGetValue(p, out int pi)) ? pi : -1;
+                    }
+                    Debug.Log($"[HZGlbWriter] added {jointCount - origJointCount} prop bones to skeleton (now {jointCount} joints)");
+                }
+            }
+
             // Append cloth-chain bones that the skin doesn't reference (VRoid _end
             // terminators MagicaCloth simulates). They exist in the rig but aren't
             // in SMR.bones, so the model would otherwise omit them and every cloth

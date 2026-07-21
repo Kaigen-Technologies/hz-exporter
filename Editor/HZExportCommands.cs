@@ -1177,7 +1177,7 @@ public static class HZExportCommands
                 // *deeper* Animator (a nested attached character) are filtered out — they get
                 // exported when we visit that nested Animator's GO as its own entity.
                 var thisAnimator = go.GetComponent<Animator>();
-                var allSmrs = go.GetComponentsInChildren<SkinnedMeshRenderer>();
+                var allSmrs = go.GetComponentsInChildren<SkinnedMeshRenderer>(true);
                 var validSmrs = new List<SkinnedMeshRenderer>();
                 foreach (var s in allSmrs)
                     if (s.sharedMesh != null && s.bones != null && s.bones.Length > 0
