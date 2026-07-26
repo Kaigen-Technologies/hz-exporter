@@ -469,9 +469,9 @@ namespace HZExporter
             for (int ii = 0; ii < imageEntries.Count; ii++)
             {
                 int mi = imageEntries[ii].matIdx;
-                if (!matTexMap.ContainsKey(mi)) matTexMap[mi] = new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+                if (!matTexMap.ContainsKey(mi)) matTexMap[mi] = new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
                 int role = imageEntries[ii].role;
-                if (role >= 0 && role < 10) matTexMap[mi][role] = ii;
+                if (role >= 0 && role < 13) matTexMap[mi][role] = ii;
             }
 
             // Materials — factors + slotted texture refs (from HZShaderMap).
@@ -491,7 +491,7 @@ namespace HZExporter
                 else
                 {
                     var f = matFactors[mi];
-                    int[] ti = matTexMap.ContainsKey(mi) ? matTexMap[mi] : new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+                    int[] ti = matTexMap.ContainsKey(mi) ? matTexMap[mi] : new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
                     json.Append($"    {{\n      \"name\": \"{EscapeJson(matName)}\",\n      \"pbrMetallicRoughness\": {{\n");
                     json.Append($"        \"baseColorFactor\": [{F(f.baseColor.r)}, {F(f.baseColor.g)}, {F(f.baseColor.b)}, {F(f.baseColor.a)}]");
                     if (ti[0] >= 0) json.Append($",\n        \"baseColorTexture\": {{ \"index\": {ti[0]} }}");
@@ -1359,9 +1359,9 @@ namespace HZExporter
             for (int i = 0; i < skinnedImageEntries.Count; i++)
             {
                 int mi2 = skinnedImageEntries[i].matIdx;
-                if (!matTexMap.ContainsKey(mi2)) matTexMap[mi2] = new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+                if (!matTexMap.ContainsKey(mi2)) matTexMap[mi2] = new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
                 int r = skinnedImageEntries[i].role;
-                if (r >= 0 && r < 10) matTexMap[mi2][r] = i;
+                if (r >= 0 && r < 13) matTexMap[mi2][r] = i;
             }
 
             json.Append("  \"materials\": [\n");
@@ -1378,7 +1378,7 @@ namespace HZExporter
                 else
                 {
                     var f = skinnedFactors[mi2];
-                    int[] ti = matTexMap.ContainsKey(mi2) ? matTexMap[mi2] : new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+                    int[] ti = matTexMap.ContainsKey(mi2) ? matTexMap[mi2] : new int[] { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
                     json.Append($"    {{\n      \"name\": \"{EscapeJson(smatName)}\",\n      \"pbrMetallicRoughness\": {{\n");
                     json.Append($"        \"baseColorFactor\": [{F(f.baseColor.r)}, {F(f.baseColor.g)}, {F(f.baseColor.b)}, {F(f.baseColor.a)}]");
@@ -1688,6 +1688,9 @@ namespace HZExporter
             int highlightIdx = ti[7];
             int blushIdx = ti[8];
             int nervousIdx = ti[9];
+            int starEyesIdx = ti[10];
+            int tearyNoiseIdx = ti[11];
+            int tearyMaskIdx = ti[12];
 
             json.Append(",\n      \"extensions\": {\n        \"VRMC_materials_mtoon\": {\n");
             json.Append("          \"specVersion\": \"1.0\",\n");
@@ -1717,6 +1720,16 @@ namespace HZExporter
             json.Append($"          \"nervousTintFactor\": [{F(mt.nervousTint.r)}, {F(mt.nervousTint.g)}, {F(mt.nervousTint.b)}],\n");
             json.Append($"          \"nervousValueFactor\": {F(mt.nervousValue)},\n");
             if (nervousIdx >= 0) json.Append($"          \"nervousMultiplyTexture\": {{ \"index\": {nervousIdx} }},\n");
+            json.Append($"          \"starEyesTintFactor\": [{F(mt.starEyesTint.r)}, {F(mt.starEyesTint.g)}, {F(mt.starEyesTint.b)}],\n");
+            json.Append($"          \"starEyesValueFactor\": {F(mt.starEyesValue)},\n");
+            if (starEyesIdx >= 0) json.Append($"          \"starEyesMaskTexture\": {{ \"index\": {starEyesIdx} }},\n");
+            json.Append($"          \"tearyEnabled\": {F(mt.tearyEnabled)},\n");
+            json.Append($"          \"tearyValueFactor\": {F(mt.tearyValue)},\n");
+            json.Append($"          \"tearyFrequencyFactor\": {F(mt.tearyFrequency)},\n");
+            json.Append($"          \"tearySpeedFactor\": {F(mt.tearySpeed)},\n");
+            json.Append($"          \"tearyAmplitudeFactor\": {F(mt.tearyAmplitude)},\n");
+            if (tearyNoiseIdx >= 0) json.Append($"          \"tearyNoiseTexture\": {{ \"index\": {tearyNoiseIdx} }},\n");
+            if (tearyMaskIdx >= 0) json.Append($"          \"tearyMaskTexture\": {{ \"index\": {tearyMaskIdx} }},\n");
             json.Append($"          \"faceShadingNormalBlend\": {F(mt.faceNormalBlend)},\n");
             json.Append($"          \"faceShadingCenter\": [{F(mt.faceCenter.x)}, {F(mt.faceCenter.y)}, {F(mt.faceCenter.z)}],\n");
             string owm = mt.outlineMode == 2 ? "screenCoordinates" : mt.outlineMode == 1 ? "worldCoordinates" : "none";

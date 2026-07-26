@@ -897,9 +897,6 @@ public static class HZExportCommands
     [MenuItem("Hz Exporter/Export Active Scene")]
     public static void ExportMutualsTest()
     {
-        UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
-            "Assets/Mutuals/mutuals_test.unity",
-            UnityEditor.SceneManagement.OpenSceneMode.Single);
         ExportScene();
     }
 

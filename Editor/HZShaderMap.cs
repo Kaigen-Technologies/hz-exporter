@@ -436,6 +436,14 @@ namespace HZExporter
             public Color nervousTint = Color.white;      // mtoon_ext.nervousTintFactor (rgb)
             public float blushValue = 0f;                // mtoon_ext.blushValueFactor
             public float nervousValue = 0f;               // mtoon_ext.nervousValueFactor
+            // non-spec extensions: StarEyes (RGBA decal) + Teary (UV-warp cry)
+            public Color starEyesTint = Color.white;      // mtoon_ext.starEyesTintFactor (rgb)
+            public float starEyesValue = 0f;             // mtoon_ext.starEyesValueFactor
+            public float tearyEnabled = 0f;              // mtoon_ext.tearyEnabled
+            public float tearyValue = 1f;                // mtoon_ext.tearyValueFactor
+            public float tearyFrequency = 3f;            // mtoon_ext.tearyFrequencyFactor
+            public float tearySpeed = 0.3f;              // mtoon_ext.tearySpeedFactor
+            public float tearyAmplitude = 0.008f;        // mtoon_ext.tearyAmplitudeFactor
             public float rimVertexColorMask = 0f;         // mtoon_ext.rimVertexColorMaskEnabled
             public float outlineVertexColorMask = 0f;     // mtoon_ext.outlineVertexColorMaskEnabled
         }
@@ -477,6 +485,13 @@ namespace HZExporter
             if (mat.HasProperty("_NervousTint")) e.nervousTint = ReadColor(mat, "_NervousTint");
             if (mat.HasProperty("_BlushValue")) e.blushValue = mat.GetFloat("_BlushValue");
             if (mat.HasProperty("_NervousValue")) e.nervousValue = mat.GetFloat("_NervousValue");
+            if (mat.HasProperty("_StarEyesTint")) e.starEyesTint = ReadColor(mat, "_StarEyesTint");
+            if (mat.HasProperty("_StarEyesValue")) e.starEyesValue = mat.GetFloat("_StarEyesValue");
+            if (mat.HasProperty("_TearyEnabled")) e.tearyEnabled = mat.GetFloat("_TearyEnabled");
+            if (mat.HasProperty("_TearyValue")) e.tearyValue = mat.GetFloat("_TearyValue");
+            if (mat.HasProperty("_TearyFrequency")) e.tearyFrequency = mat.GetFloat("_TearyFrequency");
+            if (mat.HasProperty("_TearySpeed")) e.tearySpeed = mat.GetFloat("_TearySpeed");
+            if (mat.HasProperty("_TearyAmplitude")) e.tearyAmplitude = mat.GetFloat("_TearyAmplitude");
             if (mat.HasProperty("_RimVertexColorMask")) e.rimVertexColorMask = mat.GetFloat("_RimVertexColorMask");
             if (mat.HasProperty("_OutlineVertexColorMask")) e.outlineVertexColorMask = mat.GetFloat("_OutlineVertexColorMask");
             // object-space position: must use the SAME axis conversion as the
@@ -502,6 +517,12 @@ namespace HZExporter
             if (blushTex != null) EmbedRoleTexture(blushTex, false, 8, bin, onImage);
             var nervousTex = (mat.HasProperty("_NervousMask") ? mat.GetTexture("_NervousMask") : null) as Texture2D;
             if (nervousTex != null) EmbedRoleTexture(nervousTex, false, 9, bin, onImage);
+            var starEyesTex = (mat.HasProperty("_StarEyesMask") ? mat.GetTexture("_StarEyesMask") : null) as Texture2D;
+            if (starEyesTex != null) EmbedRoleTexture(starEyesTex, false, 10, bin, onImage);
+            var tearyNoiseTex = (mat.HasProperty("_TearyNoiseTex") ? mat.GetTexture("_TearyNoiseTex") : null) as Texture2D;
+            if (tearyNoiseTex != null) EmbedRoleTexture(tearyNoiseTex, false, 11, bin, onImage);
+            var tearyMaskTex = (mat.HasProperty("_TearyMask") ? mat.GetTexture("_TearyMask") : null) as Texture2D;
+            if (tearyMaskTex != null) EmbedRoleTexture(tearyMaskTex, false, 12, bin, onImage);
 
             return e;
         }
