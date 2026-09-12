@@ -608,6 +608,97 @@ public static class HZExportCommands
         return subtractive ? LinearToSrgb(RenderSettings.subtractiveShadowColor) : Color.black;
     }
 
+    /// <summary>Dump URP renderer features (SSAO) and the active volume stack.</summary>
+    public static void DumpPostFx()
+    {
+        var urp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        if (urp != null)
+        {
+            var so = new UnityEditor.SerializedObject(urp);
+            var list = so.FindProperty("m_RendererDataList");
+            for (int i = 0; list != null && i < list.arraySize; i++)
+            {
+                var rd = list.GetArrayElementAtIndex(i).objectReferenceValue;
+                if (rd == null) continue;
+                var rso = new UnityEditor.SerializedObject(rd);
+                var feats = rso.FindProperty("m_RendererFeatures");
+                Debug.Log($"[HZDUMP] renderer[{i}]={rd.name} features={(feats != null ? feats.arraySize : 0)}");
+                for (int f = 0; feats != null && f < feats.arraySize; f++)
+                {
+                    var fo = feats.GetArrayElementAtIndex(f).objectReferenceValue;
+                    if (fo == null) continue;
+                    var fso = new UnityEditor.SerializedObject(fo);
+                    string extra = "";
+                    var it2 = fso.GetIterator(); bool go = it2.NextVisible(true);
+                    while (go) {
+                        if (it2.propertyType != UnityEditor.SerializedPropertyType.Generic)
+                            extra += $" {it2.propertyPath}={PropStr(it2)}";
+                        go = it2.NextVisible(true);
+                    }
+                    Debug.Log($"[HZDUMP]   feature {fo.GetType().Name} '{fo.name}'{extra}");
+                }
+            }
+        }
+        foreach (var v in Object.FindObjectsByType<UnityEngine.Rendering.Volume>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            Debug.Log($"[HZDUMP] volume '{v.name}' activeGO={v.gameObject.activeInHierarchy} enabled={v.enabled} global={v.isGlobal} weight={v.weight:F3} prio={v.priority} profile={(v.sharedProfile ? v.sharedProfile.name : "<null>")}");
+            if (v.sharedProfile == null) continue;
+            foreach (var c in v.sharedProfile.components)
+            {
+                if (!c.active) { Debug.Log($"[HZDUMP]   {c.GetType().Name} INACTIVE"); continue; }
+                string line = "";
+                foreach (var f in c.GetType().GetFields())
+                {
+                    var val = f.GetValue(c) as UnityEngine.Rendering.VolumeParameter;
+                    if (val == null || !val.overrideState) continue;
+                    line += $" {f.Name}={val}";
+                }
+                Debug.Log($"[HZDUMP]   {c.GetType().Name}{line}");
+            }
+        }
+    }
+
+    static string PropStr(UnityEditor.SerializedProperty p)
+    {
+        switch (p.propertyType)
+        {
+            case UnityEditor.SerializedPropertyType.Boolean: return p.boolValue.ToString();
+            case UnityEditor.SerializedPropertyType.Float: return p.floatValue.ToString("F3");
+            case UnityEditor.SerializedPropertyType.Integer: return p.intValue.ToString();
+            case UnityEditor.SerializedPropertyType.Enum: return p.enumValueIndex.ToString();
+            default: return "";
+        }
+    }
+
+    /// <summary>Dump the live lighting/camera state the exporter reads, so engine
+    /// mismatches are diagnosed against Unity's actual values, not a screenshot.</summary>
+    public static void DumpLighting()
+    {
+        var cam = Camera.main;
+        Debug.Log($"[HZDUMP] ambientMode={RenderSettings.ambientMode}"
+                + $" ambientLight={RenderSettings.ambientLight:F4}"
+                + $" ambientIntensity={RenderSettings.ambientIntensity:F4}"
+                + $" ambientSky={RenderSettings.ambientSkyColor:F4}"
+                + $" ambientEquator={RenderSettings.ambientEquatorColor:F4}"
+                + $" ambientGround={RenderSettings.ambientGroundColor:F4}");
+        Debug.Log($"[HZDUMP] skybox={(RenderSettings.skybox ? RenderSettings.skybox.name : "<null>")}"
+                + $" reflection={RenderSettings.defaultReflectionMode}"
+                + $" reflIntensity={RenderSettings.reflectionIntensity:F4}"
+                + $" customRefl={(RenderSettings.customReflectionTexture ? RenderSettings.customReflectionTexture.name : "<null>")}");
+        Debug.Log($"[HZDUMP] fog={RenderSettings.fog} fogMode={RenderSettings.fogMode}"
+                + $" fogColor={RenderSettings.fogColor:F4} fogDensity={RenderSettings.fogDensity:F4}"
+                + $" fogStart={RenderSettings.fogStartDistance:F2} fogEnd={RenderSettings.fogEndDistance:F2}");
+        if (cam != null)
+            Debug.Log($"[HZDUMP] camera clearFlags={cam.clearFlags} background={cam.backgroundColor:F4}"
+                    + $" fov={cam.fieldOfView:F3} near={cam.nearClipPlane:F3} far={cam.farClipPlane:F1}"
+                    + $" allowHDR={cam.allowHDR} gamma={QualitySettings.activeColorSpace}");
+        var urp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        if (urp != null)
+            Debug.Log($"[HZDUMP] urp msaa={urp.msaaSampleCount} hdr={urp.supportsHDR}"
+                    + $" shadowDistance={urp.shadowDistance:F1} cascades={urp.shadowCascadeCount}"
+                    + $" softShadows={urp.supportsSoftShadows} colorGrading={urp.colorGradingMode}");
+    }
+
     /// <summary>Open Idyllic Fantasy Nature scene_day and run the full scene export.</summary>
     public static void ExportSceneDay()
     {
@@ -1551,10 +1642,30 @@ public static class HZExportCommands
         // ambient/fog which the engine srgb_to_linears on use.
         Color clearCol = mainCam != null ? mainCam.backgroundColor : Color.black;
 
-        // Skybox / IBL env: bake the active Unity skybox to an equirect .hdr only when
-        // the camera actually renders it (or skybox-based ambient needs the IBL).
-        bool wantsSkybox = cameraUsesSkybox;
-        bool wantsEnv = wantsSkybox || RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Skybox;
+        // Skybox / IBL env. clearFlags alone is NOT enough: with no skybox material
+        // Unity clears to the camera background and has no reflection source, so
+        // exporting an env would add ambient the Unity frame does not have. A
+        // camera-local Skybox component overrides RenderSettings.
+        Material effectiveSky = RenderSettings.skybox;
+        if (mainCam != null)
+        {
+            var camSky = mainCam.GetComponent<Skybox>();
+            if (camSky != null && camSky.material != null) effectiveSky = camSky.material;
+        }
+        bool ambientFromSky =
+            RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Skybox &&
+            effectiveSky != null;
+        bool reflFromCustom =
+            RenderSettings.defaultReflectionMode ==
+                UnityEngine.Rendering.DefaultReflectionMode.Custom &&
+            RenderSettings.customReflectionTexture != null;
+        bool reflFromSky =
+            RenderSettings.defaultReflectionMode ==
+                UnityEngine.Rendering.DefaultReflectionMode.Skybox &&
+            effectiveSky != null;
+
+        bool wantsSkybox = cameraUsesSkybox && effectiveSky != null;
+        bool wantsEnv = wantsSkybox || ambientFromSky || reflFromCustom || reflFromSky;
         string envAssetPath = null;
         float envIntensity = 1.0f;
         if (wantsEnv)
@@ -1563,10 +1674,12 @@ public static class HZExportCommands
             if (HZSkyboxExporter.Export(hdrPath))
             {
                 envAssetPath = $"{AssetPrefix}/environments/{sceneName}_skybox.hza";
-                envIntensity = RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Skybox
-                    ? RenderSettings.ambientIntensity : 1.0f;
+                envIntensity = ambientFromSky ? RenderSettings.ambientIntensity
+                                              : RenderSettings.reflectionIntensity;
             }
         }
+        if (!wantsEnv)
+            Debug.Log("[HZ] no skybox/reflection source — exporting flat clear + no IBL");
 
         // Scene settings (synthetic entity, no GameObject)
         {
@@ -1578,7 +1691,11 @@ public static class HZExportCommands
             // provides the ambient. Adding the flat ambient_color*intensity on top
             // double-counts (blown-out white). Zero the flat term whenever an env
             // is present; scenes without a skybox keep their flat ambient.
-            float flatAmbientIntensity = envAssetPath != null ? 0f : RenderSettings.ambientIntensity;
+            float flatAmbientIntensity =
+                envAssetPath != null ? 0f
+                : RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Skybox
+                      ? RenderSettings.ambientIntensity
+                      : 1.0f; // Flat/Trilight: ambientLight IS the ambient
             // Unity FogMode: Linear=1, Exponential=2, ExponentialSquared=3 — same numbers as RendererFogMode.
             uint fogMode = RenderSettings.fog ? (uint)RenderSettings.fogMode : 0u;
             // RenderSettings.fogColor already comes back in the space the engine
