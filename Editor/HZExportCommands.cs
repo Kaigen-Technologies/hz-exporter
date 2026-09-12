@@ -747,6 +747,8 @@ public static class HZExportCommands
                 string key = mat.name + "|" + mesh.name;
                 if (!seen.Add(key)) continue;
                 bool uv3 = mesh.HasVertexAttribute(UnityEngine.Rendering.VertexAttribute.TexCoord3);
+                string allAttrs = string.Join(" ", System.Array.ConvertAll(mesh.GetVertexAttributes(), a => a.attribute.ToString()));
+                Debug.Log($"[HZVM] attrs mat='{mat.name}' mesh='{mesh.name}' [{allAttrs}]");
                 string kws = string.Join(",", mat.shaderKeywords);
                 Debug.Log($"[HZVM] mat='{mat.name}' mesh='{mesh.name}' hasUV3={uv3} overlayUV={mat.IsKeywordEnabled("_COLOR_OVERLAY_UV")} keywords=[{kws}]");
             }
@@ -779,6 +781,120 @@ public static class HZExportCommands
 
         for (int i = 0; i < mats.Count; i++) { mats[i].SetColor("_Bottom_Color", sb[i]); mats[i].SetColor("_Top_Color", st[i]); }
         Debug.Log($"[HZBR] probed {mats.Count} materials; colours restored");
+    }
+
+    /// <summary>Write Unity's own generated shader for the Vegetation graph, so the
+    /// translation is checked against what URP actually compiles, not the graph JSON.</summary>
+    public static void DumpVegetationGeneratedShader()
+    {
+        const string graph = "Assets/Idyllic Fantasy Nature/Shader/Vegetation.shadergraph";
+        var asm = System.Type.GetType("UnityEditor.ShaderGraph.ShaderGraphImporter, Unity.ShaderGraph.Editor").Assembly;
+        var importer = asm.GetType("UnityEditor.ShaderGraph.ShaderGraphImporter");
+        var assetsT = asm.GetType("UnityEditor.ShaderGraph.AssetCollection");
+        System.Reflection.MethodInfo getText = null;
+        foreach (var m in importer.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public))
+            if (m.Name == "GetShaderText" && m.GetParameters().Length == 4) getText = m;
+        if (getText == null || assetsT == null) { Debug.LogError("[HZGS] GetShaderText(path, out tex, assets, out graph) not found"); return; }
+        var args = new object[] { graph, null, System.Activator.CreateInstance(assetsT, true), null };
+        var text = (string)getText.Invoke(null, args);
+        string outPath = $"{ABDir}/Vegetation.generated.shader";
+        System.IO.File.WriteAllText(outPath, text);
+        Debug.Log($"[HZGS] wrote {outPath} ({text.Length} chars)");
+    }
+
+    /// <summary>List every material/shader pair rendered in the scene with its mesh, so a
+    /// region of the frame can be tied to the shader that actually draws it.</summary>
+    public static void DumpSceneMaterials()
+    {
+        var seen = new System.Collections.Generic.HashSet<string>();
+        foreach (var r in Object.FindObjectsByType<Renderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            var mf = r.GetComponent<MeshFilter>();
+            string mesh = mf != null && mf.sharedMesh != null ? mf.sharedMesh.name : "<none>";
+            foreach (var mat in r.sharedMaterials)
+            {
+                if (mat == null) continue;
+                string key = mat.name + "|" + (mat.shader != null ? mat.shader.name : "?");
+                if (!seen.Add(key)) continue;
+                Debug.Log($"[HZSM] mat='{mat.name}' shader='{(mat.shader != null ? mat.shader.name : "?")}' go='{r.gameObject.name}' mesh='{mesh}' keywords=[{string.Join(",", mat.shaderKeywords)}]");
+            }
+        }
+        Debug.Log("[HZSM] done");
+    }
+
+    /// <summary>Controlled read of what the Vegetation graph sees in TEXCOORD3 when a mesh
+    /// does not provide it. Quads with known constant UV0/UV1 and no UV3, plus a control quad
+    /// that does carry UV3; blend_height 0.2 makes the overlay T equal uv3.y, and the ramp is
+    /// reversed across two captures so T = A/(A+B) independent of lighting.</summary>
+    public static void CaptureUv3AliasProbe()
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZUA] no main camera"); return; }
+        var shader = Shader.Find("Idyllic Fantasy Nature/Vegetation");
+        if (shader == null) { Debug.LogError("[HZUA] Vegetation shader not found"); return; }
+
+        var mat = new Material(shader) { hideFlags = HideFlags.DontSave };
+        mat.SetFloat("_COLOR_OVERLAY", 1);
+        mat.DisableKeyword("_COLOR_OVERLAY_VERTEX_POSITION");
+        mat.EnableKeyword("_COLOR_OVERLAY_UV");
+        mat.SetFloat("_Custom_Color", 1);
+        mat.SetFloat("_Enable_Top_Color", 1);
+        mat.SetFloat("_Blend_Height", 0.2f);
+        mat.SetFloat("_Alpha_Cutoff", 0.0f);
+        mat.SetFloat("_Wind_Strength", 0);
+        mat.SetFloat("_Bend_Strength", 0);
+        mat.SetFloat("_Start_Bend_Range", 0);
+        mat.SetVector("_Player_Position", new Vector4(1e5f, 1e5f, 1e5f, 0));
+        mat.SetTexture("_Texture", Texture2D.whiteTexture);
+
+        // (label, uv0.y, uv1.y or <0 for none, uv3.y or <0 for none)
+        var cases = new (string label, float uv0, float uv1, float uv3)[]
+        {
+            ("uv0=0.25 uv1=0.75 noUV3", 0.25f, 0.75f, -1f),
+            ("uv0=0.60 noUV1 noUV3",   0.60f, -1f,   -1f),
+            ("CONTROL uv0=0.25 uv3=0.40", 0.25f, -1f, 0.40f),
+            ("uv0=0.25 uv2=0.55 noUV1 noUV3", 0.25f, -1f, -1f),
+            ("uv0=0.25 uv1=0.75 uv2=0.55 noUV3", 0.25f, 0.75f, -1f),
+        };
+        var uv2 = new float[] { -1f, -1f, -1f, 0.55f, 0.55f };
+        var objs = new System.Collections.Generic.List<GameObject>();
+        var centers = new Vector3[cases.Length];
+        var fwd = cam.transform.forward; var right = cam.transform.right; var up = cam.transform.up;
+        for (int i = 0; i < cases.Length; i++)
+        {
+            var c = cases[i];
+            var m = new Mesh { hideFlags = HideFlags.DontSave, name = "HZUA_" + i };
+            float h = 0.3f;
+            m.vertices = new[] { new Vector3(-h,-h,0), new Vector3(h,-h,0), new Vector3(h,h,0), new Vector3(-h,h,0) };
+            m.normals = new[] { Vector3.back, Vector3.back, Vector3.back, Vector3.back };
+            m.SetUVs(0, new System.Collections.Generic.List<Vector2> { new Vector2(0,c.uv0), new Vector2(0,c.uv0), new Vector2(0,c.uv0), new Vector2(0,c.uv0) });
+            if (c.uv1 >= 0) m.SetUVs(1, new System.Collections.Generic.List<Vector2> { new Vector2(0,c.uv1), new Vector2(0,c.uv1), new Vector2(0,c.uv1), new Vector2(0,c.uv1) });
+            if (uv2[i] >= 0) m.SetUVs(2, new System.Collections.Generic.List<Vector2> { new Vector2(0,uv2[i]), new Vector2(0,uv2[i]), new Vector2(0,uv2[i]), new Vector2(0,uv2[i]) });
+            if (c.uv3 >= 0) m.SetUVs(3, new System.Collections.Generic.List<Vector2> { new Vector2(0,c.uv3), new Vector2(0,c.uv3), new Vector2(0,c.uv3), new Vector2(0,c.uv3) });
+            m.triangles = new[] { 0,2,1, 0,3,2, 0,1,2, 0,2,3 };
+            m.RecalculateBounds();
+            var go = new GameObject("HZUA_" + i) { hideFlags = HideFlags.DontSave };
+            go.AddComponent<MeshFilter>().sharedMesh = m;
+            go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            centers[i] = cam.transform.position + fwd * 3f + right * ((i - 2) * 0.7f) + up * 0.3f;
+            go.transform.SetPositionAndRotation(centers[i], cam.transform.rotation);
+            objs.Add(go);
+            Debug.Log($"[HZUA] quad{i} {c.label} attrs=[{string.Join(" ", System.Array.ConvertAll(m.GetVertexAttributes(), a => a.attribute.ToString()))}]");
+        }
+
+        mat.SetColor("_Bottom_Color", Color.black); mat.SetColor("_Top_Color", Color.white);
+        ShootPlain(cam, $"{ABDir}/unity_uv3alias_A.png");
+        mat.SetColor("_Bottom_Color", Color.white); mat.SetColor("_Top_Color", Color.black);
+        ShootPlain(cam, $"{ABDir}/unity_uv3alias_B.png");
+
+        for (int i = 0; i < centers.Length; i++)
+        {
+            var vp = cam.WorldToViewportPoint(centers[i]);
+            Debug.Log($"[HZUA] quad{i} px=({vp.x * 1920f:F0},{(1f - vp.y) * 1080f:F0})");
+        }
+        foreach (var go in objs) { Object.DestroyImmediate(go.GetComponent<MeshFilter>().sharedMesh); Object.DestroyImmediate(go); }
+        Object.DestroyImmediate(mat);
+        Debug.Log("[HZUA] done");
     }
 
     static void ShootPlain(Camera cam, string path)

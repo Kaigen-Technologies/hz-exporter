@@ -29,6 +29,46 @@ namespace HZExporter
         // session-scoped dedup: warn once per mesh per editor domain reload so
         // re-exports don't drown the console in identical messages. clears on
         // domain reload (which is when new content would have been imported).
+        static readonly HashSet<string> _uvAliasWarned = new HashSet<string>();
+        static readonly Dictionary<string, bool> _graphReadsHighUv = new Dictionary<string, bool>();
+
+        /// <summary>The shader translation reads a missing UV2/UV3 as UV0, which is what Unity
+        /// binds only when the mesh carries nothing above UV0. Report meshes where Unity would
+        /// alias to UV1/UV2 instead, so that divergence is never silent.</summary>
+        public static void WarnUvAlias(Mesh mesh, Material mat)
+        {
+            if (mesh == null || mat == null || mat.shader == null) return;
+            bool uv1 = mesh.HasVertexAttribute(UnityEngine.Rendering.VertexAttribute.TexCoord1);
+            bool uv2 = mesh.HasVertexAttribute(UnityEngine.Rendering.VertexAttribute.TexCoord2);
+            if (!uv1 && !uv2) return;
+            string path = UnityEditor.AssetDatabase.GetAssetPath(mat.shader);
+            if (string.IsNullOrEmpty(path) || !GraphReadsHighUv(path, 0)) return;
+            if (!_uvAliasWarned.Add(mesh.name + "|" + mat.name)) return;
+            Debug.LogWarning($"[HZGlbWriter] '{mat.name}' on mesh '{mesh.name}' reads UV2/UV3, which Unity aliases to {(uv2 ? "UV2" : "UV1")} on this mesh; the engine translation reads UV0, so that input will differ.");
+        }
+
+        static bool GraphReadsHighUv(string path, int depth)
+        {
+            if (_graphReadsHighUv.TryGetValue(path, out bool cached)) return cached;
+            bool reads = false;
+            if (depth < 8 && (path.EndsWith(".shadergraph") || path.EndsWith(".shadersubgraph")) && System.IO.File.Exists(path))
+            {
+                string text = System.IO.File.ReadAllText(path);
+                foreach (string chunk in text.Split(new[] { "\n}\n" }, System.StringSplitOptions.None))
+                    if (chunk.Contains("\"UnityEditor.ShaderGraph.UVNode\"") &&
+                        System.Text.RegularExpressions.Regex.IsMatch(chunk, "\"m_OutputChannel\":\\s*[23]\\b"))
+                    { reads = true; break; }
+                if (!reads)
+                    foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(text, "\\\\\"guid\\\\\":\\s*\\\\\"([0-9a-f]{32})\\\\\""))
+                    {
+                        string sub = UnityEditor.AssetDatabase.GUIDToAssetPath(m.Groups[1].Value);
+                        if (sub.EndsWith(".shadersubgraph") && GraphReadsHighUv(sub, depth + 1)) { reads = true; break; }
+                    }
+            }
+            _graphReadsHighUv[path] = reads;
+            return reads;
+        }
+
         static readonly HashSet<string> _uvWarnedMeshes = new HashSet<string>();
         public static void WarnExtraUVs(Mesh mesh)
         {
@@ -282,6 +322,7 @@ namespace HZExporter
                 var entry = HZShaderMap.Lookup(materials[mi]);
                 if (entry != null && entry.customShader)
                 {
+                    WarnUvAlias(mesh, materials[mi]);
                     customMats[mi] = HZShaderMap.EmbedCustomMaterial(materials[mi], false, bin, img =>
                     {
                         imageEntries.Add((img.off, img.size, img.name, capturedMi, img.role));
@@ -814,6 +855,7 @@ namespace HZExporter
             {
                 var smr = smrs[mi];
                 var mesh = smr.sharedMesh;
+                foreach (var sm in smr.sharedMaterials) WarnUvAlias(mesh, sm);
                 int vertexCount = mesh.vertexCount;
                 var vertices = mesh.vertices;
                 var normals = mesh.normals;

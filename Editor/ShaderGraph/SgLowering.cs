@@ -43,12 +43,6 @@ namespace HZExporter.ShaderGraph
         // `mat.<field>` (since `mat` isn't in scope inside a function).
         public bool IsSubGraph;
 
-        // True when lowering the grass-SSBO variant. Unity's terrain-detail
-        // instancing supplies TEXCOORD3 as a root->tip blade factor (measured:
-        // the graph's UV3-driven colour overlay ramps 0 at the root to 1 at the
-        // tip), which the grass pull exposes as the normalized local height.
-        public bool IsGrass;
-
         // Prefix for newly-emitted temp names. Defaults to `_n`. Per-branch
         // KeywordNode contexts override this to `_b<idx>_n` so branch-local
         // temps never collide with outer or sibling-branch names.
@@ -428,16 +422,14 @@ namespace HZExporter.ShaderGraph
                 // the stage reads (0,0,0,0). Substituting UV0 invents a
                 // gradient Unity never draws (measured on the terrain-detail
                 // grass, whose meshes carry TexCoord0 only).
-                case 3 when ctx.IsGrass:
-                    // Unity's terrain-detail instancing feeds TEXCOORD3 a
-                    // root->tip blade factor; grass_terrain_pull exposes the
-                    // same quantity. Only .y is meaningful, matching the graph.
-                    source = ctx.IsVertexStage
-                        ? "vec2(0.0, gv.height_t)"
-                        : "vec2(0.0, (v_object_pos.y - mat.pos_min.y) / max(mat.pos_extent.y, 1e-3))";
-                    break;
+                // UV2/UV3 aren't in the engine vertex layout. Unity binds a
+                // missing TEXCOORDn to the nearest lower channel the mesh has
+                // (measured: uv0-only -> uv0, uv0+uv1 -> uv1, uv0+uv2 -> uv2),
+                // so for a UV0-only mesh it is UV0 in Unity's V convention; the
+                // engine stores glTF V, hence the flip. Meshes that would alias
+                // to UV1/UV2 instead are reported by HZGlbWriter.WarnUvAlias.
                 case 2: case 3:
-                    source = $"vec2(0.0) /* UV{channel}: not in vertex layout; Unity reads unbound TEXCOORD{channel} as 0 */";
+                    source = ctx.IsVertexStage ? "vec2(v.uv.x, 1.0 - v.uv.y)" : "vec2(v_uv.x, 1.0 - v_uv.y)";
                     break;
                 default: throw new NotImplementedException($"UV channel {channel} not wired");
             }
@@ -552,7 +544,7 @@ namespace HZExporter.ShaderGraph
             foreach (var n in sg.Nodes.Values) if (n.Type == "SubGraphOutputNode") { sgOut = n; break; }
             if (sgOut == null) throw new System.Exception($"subgraph {guid} has no SubGraphOutputNode");
 
-            var fnCtx = new LowerCtx(sg) { IsVertexStage = ctx.IsVertexStage, IsSubGraph = true, IsGrass = ctx.IsGrass };
+            var fnCtx = new LowerCtx(sg) { IsVertexStage = ctx.IsVertexStage, IsSubGraph = true };
 
             // Subgraph properties become function parameters. PropertyNode
             // inside the subgraph body will reference them as bare names.
@@ -899,7 +891,6 @@ namespace HZExporter.ShaderGraph
             {
                 IsVertexStage = parentCtx.IsVertexStage,
                 IsSubGraph = parentCtx.IsSubGraph,
-                IsGrass = parentCtx.IsGrass,
                 TempPrefix = $"{parentPath}_b{idx}_n",
             };
             // Lower the value flowing into the branch's input slot. This may
