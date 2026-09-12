@@ -20,6 +20,12 @@ namespace HZExporter
         // Subdir inside the engine project where exports land.
         public string engineAssetsSubdir = "assets/unity";
 
+        // Engine project shader root (the dir that IS `shaders/` in an engine path).
+        // Translated ShaderGraphs land in the subdir their shader_mapping.json
+        // engineShader path names, e.g. /shaders/unity/water.hz.glsl ->
+        // <shaderRootDir>/unity/water.hz.glsl. Empty = stage under outputDir/shaders.
+        public string shaderRootDir = "";
+
         // When true, ExportScene copies the staging dir into the engine project after export.
         public bool autoCopyOnExport = false;
 
@@ -72,6 +78,13 @@ namespace HZExporter
         {
             string dir = string.IsNullOrEmpty(outputDir) ? "ExportedAssets" : outputDir;
             return Path.GetFullPath(dir);
+        }
+
+        /// <summary>Absolute engine shader root, or null when not configured.</summary>
+        public string ResolvedShaderRootDir()
+        {
+            if (string.IsNullOrEmpty(shaderRootDir)) return null;
+            return Path.GetFullPath(shaderRootDir);
         }
 
         /// <summary>Absolute engine destination dir, or null when not configured.</summary>

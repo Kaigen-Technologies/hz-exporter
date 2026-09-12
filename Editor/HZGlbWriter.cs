@@ -288,9 +288,16 @@ namespace HZExporter
                         return imageEntries.Count - 1;
                     });
                     // Custom-shader grass meshes use the shader's `_grass` variant
-                    // (e.g. vegetation.hz.glsl → vegetation_grass.hz.glsl).
+                    // (e.g. vegetation.hz.glsl → vegetation_grass.hz.glsl). The grass
+                    // @material carries the canonical placement prefix the plain shadow
+                    // sibling lacks, and every pass shares one material slice — so the
+                    // shadow shader goes, as on the engine's own grass_terrain material.
                     if (grassShader && customMats[mi] != null)
+                    {
                         customMats[mi].shaderPath = GrassShaderVariant(customMats[mi].shaderPath);
+                        customMats[mi].shadowShaderPath = null;
+                        customMats[mi].shadowKeywords = null;
+                    }
                 }
                 else if (grassShader)
                 {

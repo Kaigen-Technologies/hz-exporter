@@ -1353,9 +1353,10 @@ namespace HZExporter.ShaderGraph
     }
 
     // BakedGINode: diffuse indirect irradiance. Maps to the engine's
-    // `hz_baked_gi(world_pos, world_normal)` helper which samples the diffuse
-    // probe (skybox cubemap @ max mip). Raw irradiance — NOT premultiplied by
-    // albedo — matching Unity's BakedGINode contract.
+    // `ibl_irradiance(dir)` helper which samples the env cubemap at max mip.
+    // Raw irradiance — NOT premultiplied by albedo — matching Unity's
+    // BakedGINode contract. PositionWS has no effect: the engine has one
+    // global env probe, so only the normal selects the sample direction.
     //
     // Slot layout per Unity's BakedGINode.cs:
     //   0=NormalWS (input), 1=Out (output), 2=PositionWS (input),
@@ -1366,10 +1367,9 @@ namespace HZExporter.ShaderGraph
         {
             // Inputs default to v_world_pos / v_normal when unconnected. Pull
             // them through ctx.Input so wired overrides flow correctly.
-            SgRhs pos = HasEdge(node, 2, ctx) ? ctx.Input(node.Id, 2).Rhs : Sg.Raw("v_world_pos");
             SgRhs nrm = HasEdge(node, 0, ctx) ? ctx.Input(node.Id, 0).Rhs : Sg.Raw("v_normal");
             return ctx.EmitTemp(SgType.Vec3,
-                Sg.RawTemplate("hz_baked_gi({0}, {1})", pos, nrm));
+                Sg.RawTemplate("ibl_irradiance({0})", nrm));
         }
 
         static bool HasEdge(SgNode node, int slotNum, LowerCtx ctx)

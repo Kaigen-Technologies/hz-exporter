@@ -164,6 +164,14 @@ namespace HZExporter
         /// <summary>All Unity shader names present in shader_mapping.json.</summary>
         public static IEnumerable<string> MappedShaderNames() { EnsureLoaded(); return s_byShader.Keys; }
 
+        /// <summary>Mapping entry for a Unity shader name, or null when unmapped.</summary>
+        public static ShaderEntry LookupByName(string unityShaderName)
+        {
+            EnsureLoaded();
+            if (string.IsNullOrEmpty(unityShaderName)) return null;
+            return s_byShader.TryGetValue(unityShaderName, out var e) ? e : null;
+        }
+
         /// <summary>Lookup the mapping entry for a material's shader, falling back to the default.</summary>
         public static ShaderEntry Lookup(Material mat)
         {

@@ -106,7 +106,7 @@ namespace HZExporter.ShaderGraph
                 }
                 fwdG.AppendLine("#include \"renderer.glsl\"");
                 fwdG.AppendLine();
-                fwdG.Append(EmitFromTemplate(g, LIT_GRASS_TEMPLATE, isLit: true));
+                fwdG.Append(EmitFromTemplate(g, LIT_GRASS_TEMPLATE, isLit: true, grass: true));
                 grass = fwdG.ToString();
             }
 
@@ -124,7 +124,7 @@ namespace HZExporter.ShaderGraph
             public string Format() => $"{SgTypes.Glsl(Type)} {Symbol} = {Rhs.ToGlsl()};";
         }
 
-        static string EmitFromTemplate(SgGraph g, string template, bool isLit)
+        static string EmitFromTemplate(SgGraph g, string template, bool isLit, bool grass = false)
         {
             // ----- vertex stage --------------------------------------------
             var vsCtx = new LowerCtx(g) { IsVertexStage = true };
@@ -204,7 +204,13 @@ namespace HZExporter.ShaderGraph
             // those references intact since `mat` is an opaque struct ref).
             string vsBodyStr = vsBody.ToString();
             bool vsNeedsMaterial = vsBodyStr.Contains("mat.");
-            string vsMaterial = vsNeedsMaterial ? FormatVertexMaterialMirror(g) : "";
+            // `@material` is declared ONCE, in the first stage that reads it;
+            // the engine preprocessor gives that stage the struct + unpack and
+            // later stages inherit both. The grass @vs always reads it — the
+            // pull helper takes MaterialFS.
+            bool materialInVs = vsNeedsMaterial || grass;
+            string vsMaterial = materialInVs ? FormatMaterialStruct(g, grass) : "";
+            string fsMaterial = materialInVs ? "" : FormatMaterialStruct(g, grass);
             string vsMatUnpack = vsNeedsMaterial
                 ? "    MaterialFS mat = MaterialFS_unpack(v.material_offset);\n"
                 : "";
@@ -230,7 +236,7 @@ namespace HZExporter.ShaderGraph
 
             return template
                 .Replace("${LIGHTING}", lighting)
-                .Replace("${MATERIAL_STRUCT}", FormatMaterialStruct(g))
+                .Replace("${MATERIAL_STRUCT}", fsMaterial)
                 .Replace("${VS_MATERIAL}",    vsMaterial)
                 .Replace("${VS_MAT_UNPACK}",  vsMatUnpack)
                 .Replace("${VS_HELPERS}",   vsHelpers.ToString())
@@ -304,13 +310,14 @@ namespace HZExporter.ShaderGraph
 
             string vsBodyStr = vsBody.ToString();
             bool vsNeedsMaterial = vsBodyStr.Contains("mat.");
-            string vsMaterial = vsNeedsMaterial ? FormatVertexMaterialMirror(g) : "";
+            string vsMaterial = vsNeedsMaterial ? FormatMaterialStruct(g) : "";
+            string fsMaterial = vsNeedsMaterial ? "" : FormatMaterialStruct(g);
             string vsMatUnpack = vsNeedsMaterial
                 ? "    MaterialFS mat = MaterialFS_unpack(v.material_offset);\n"
                 : "";
 
             return SHADOW_TEMPLATE
-                .Replace("${MATERIAL_STRUCT}", FormatMaterialStruct(g))
+                .Replace("${MATERIAL_STRUCT}", fsMaterial)
                 .Replace("${VS_MATERIAL}",     vsMaterial)
                 .Replace("${VS_MAT_UNPACK}",   vsMatUnpack)
                 .Replace("${VS_HELPERS}",      vsHelpers.ToString())
@@ -396,87 +403,36 @@ namespace HZExporter.ShaderGraph
         // MaterialFS struct: one field per declared property, in declaration
         // order. Texture properties get the @texture2D annotation. Graphs
         // with no exposed properties still get a single placeholder field
-        // (the engine compiler requires at least one).
-        // The engine's preprocessor expands the @material block in @fs only —
-        // it emits the MaterialFS struct, DECLARE_TEXTURE() calls, and the
-        // MaterialFS_unpack() helper. When a graph reads material uniforms in
-        // its vertex stage (wind/bend displacement, etc.) we have to mirror
-        // the struct + unpack as plain GLSL since hz_materials.data[] is
-        // bound in both stages but MaterialFS isn't. We use the same struct
-        // name so `mat.X` references emit identically across stages.
-        //
-        // Texture fields stay as `uint` (just storage indices); the actual
-        // sampler bindings are fragment-only and the vertex stage shouldn't
-        // sample anyway. Bool fields are stored as `float` to match the
-        // fragment-side rewrite in FormatMaterialStruct.
-        static string FormatVertexMaterialMirror(SgGraph g)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine();
-            sb.AppendLine("// vertex-stage material accessors (mirrors the @fs MaterialFS that the");
-            sb.AppendLine("// engine preprocessor generates — needed when the graph's vertex stage");
-            sb.AppendLine("// reads material uniforms, e.g. wind/bend displacement).");
-            sb.AppendLine("struct MaterialFS {");
-            if (g.Properties.Count == 0)
-            {
-                sb.AppendLine("    vec4 _placeholder;");
-            }
-            else
-            {
-                foreach (var p in g.Properties)
-                {
-                    if (p.Type == SgType.SamplerState) continue;
-                    string ty = p.Type == SgType.Texture2D ? "uint"
-                              : p.Type == SgType.Bool      ? "float"
-                                                            : SgTypes.Glsl(p.Type);
-                    sb.Append("    ").Append(ty).Append(' ').Append(p.FieldName).AppendLine(";");
-                }
-            }
-            sb.AppendLine("};");
-            sb.AppendLine("MaterialFS MaterialFS_unpack(uint material_offset) {");
-            sb.AppendLine("    uint mbase = material_offset;");
-            sb.AppendLine("    MaterialFS m;");
-            foreach (var p in g.Properties)
-            {
-                if (p.Type == SgType.SamplerState) continue;
-                string field = "m." + p.FieldName;
-                if (p.Type == SgType.Texture2D)
-                {
-                    sb.AppendLine($"    {field} = hz_materials.data[mbase++];");
-                }
-                else if (p.Type == SgType.Float || p.Type == SgType.Bool)
-                {
-                    sb.AppendLine($"    {field} = uintBitsToFloat(hz_materials.data[mbase++]);");
-                }
-                else if (p.Type == SgType.Vec2)
-                {
-                    sb.AppendLine($"    {field} = vec2(uintBitsToFloat(hz_materials.data[mbase++]), uintBitsToFloat(hz_materials.data[mbase++]));");
-                }
-                else if (p.Type == SgType.Vec3)
-                {
-                    sb.AppendLine($"    {field} = vec3(uintBitsToFloat(hz_materials.data[mbase++]), uintBitsToFloat(hz_materials.data[mbase++]), uintBitsToFloat(hz_materials.data[mbase++]));");
-                }
-                else if (p.Type == SgType.Vec4)
-                {
-                    sb.AppendLine($"    {field} = vec4(uintBitsToFloat(hz_materials.data[mbase++]), uintBitsToFloat(hz_materials.data[mbase++]), uintBitsToFloat(hz_materials.data[mbase++]), uintBitsToFloat(hz_materials.data[mbase++]));");
-                }
-                else
-                {
-                    // Fall-through: emit a comment so the gap is visible.
-                    sb.AppendLine($"    // TODO: vs material unpack for type {p.Type} on field '{p.FieldName}'");
-                }
-            }
-            sb.AppendLine("    return m;");
-            sb.AppendLine("}");
-            return sb.ToString();
-        }
+        // (the engine compiler requires at least one). Bool fields are stored
+        // as float — the engine preprocessor has no bool material field.
+        // Placement fields grass_terrain_pull.glsl requires BY NAME; the grass
+        // system writes them per kind at runtime (grass_system.c). A graph
+        // property with one of these names would produce a duplicate field, so
+        // the emitter below skips it.
+        static readonly string[] GrassCanonicalFields = {
+            "heightmap", "pos_min", "pos_extent", "height_world_origin",
+            "height_world_size", "height_scale", "height_base", "wind_response",
+        };
 
-        static string FormatMaterialStruct(SgGraph g)
+        const string GRASS_CANONICAL_BLOCK =
+@"    @texture2D @white @vs_sample
+    uint  heightmap;
+    vec3  pos_min;
+    vec3  pos_extent;
+    vec2  height_world_origin;
+    vec2  height_world_size;
+    float height_scale;
+    float height_base;
+    float wind_response;
+";
+
+        static string FormatMaterialStruct(SgGraph g, bool grass = false)
         {
             var sb = new StringBuilder();
             sb.AppendLine("@material");
             sb.AppendLine("struct MaterialFS {");
-            if (g.Properties.Count == 0)
+            if (grass) sb.Append(GRASS_CANONICAL_BLOCK);
+            if (g.Properties.Count == 0 && !grass)
             {
                 sb.AppendLine("    vec4 _placeholder;");
             }
@@ -484,6 +440,8 @@ namespace HZExporter.ShaderGraph
             {
                 foreach (var p in g.Properties)
                 {
+                    if (grass && System.Array.IndexOf(GrassCanonicalFields, p.FieldName) >= 0)
+                        continue;
                     if (p.Type == SgType.Texture2D)
                     {
                         sb.AppendLine("    @texture2D");
@@ -717,18 +675,27 @@ ${LIGHTING}
 @end
 ";
 
-        // Grass variant of LIT_TEMPLATE: the @fs/@material blocks are byte-identical
-        // to LIT_TEMPLATE, but the @vs is fully literal and pulls geometry from the
-        // grass SSBOs (grass_terrain_pull.glsl) instead of unpack_instance_data().
-        // It intentionally omits the graph's vertex substitutions (${VERTEX_BODY},
-        // ${VS_POS}, ${VS_NORMAL}, ${VS_TANGENT}, ${VS_MATERIAL}, ${VS_MAT_UNPACK},
-        // ${VS_HELPERS}) — EmitFromTemplate's .Replace of those is a harmless no-op
-        // when absent. Materials used on grass point shader_source at this file.
+        // Grass variant of LIT_TEMPLATE: the @fs is LIT_TEMPLATE's, but the @vs is
+        // fully literal and pulls geometry from the grass SSBOs
+        // (grass_terrain_pull.glsl) instead of unpack_instance_data(). The
+        // @material moves to the @vs (the pull reads placement from it) and
+        // carries the canonical placement fields the grass system binds by name.
+        // The graph's vertex substitutions (${VERTEX_BODY}, ${VS_POS}, ...) are
+        // intentionally absent; .Replace of a missing placeholder is a no-op.
         const string LIT_GRASS_TEMPLATE =
 @"@vs
 #define HZ_RENDERER_TERRAIN
-#define HZ_RENDERER_GRASS
+${VS_MATERIAL}
 #include ""grass_terrain_pull.glsl""
+
+// binding 2: the FS defines HZ_RENDERER_SHADOWS, which takes _ShadowParams=1
+layout(binding = 2) uniform _DrawParams {
+    uint material_offset;
+    uint _dp_pad0;
+    uint _dp_pad1;
+    uint _dp_pad2;
+} hz_draw_params;
+
 out vec3 v_world_pos;
 out vec3 v_object_pos;
 out vec3 v_normal;
@@ -740,39 +707,20 @@ out vec3 v_tangent;
 out float v_bitangent_sign;
 out float v_view_depth;
 void main() {
-    uint mo = hz_grass_draw.data[0u];
-    GrassVsParams p = grass_vs_params();
-    uint vb = uint(gl_VertexIndex) * 2u;
-    vec3 vpos = grass_unpack_pos_rgb10a2(hz_grass_vertices.data[vb + 0u], p.pos_min, p.pos_extent);
-    vec2 vuv = unpackHalf2x16(hz_grass_vertices.data[vb + 1u]);
-    uint ib = HZ_INSTANCE_INDEX * 2u;
-    vec2 world_xz = unpackHalf2x16(hz_grass_instances.data[ib + 0u]);
-    uint i1 = hz_grass_instances.data[ib + 1u];
-    float yaw = float(i1 & 0xFFFFu) / 65535.0 * 6.28318530718;
-    float scale_uni = unpackHalf2x16(i1).y;
-    vec3 sp = vpos * scale_uni;
-    float c = cos(yaw), s = sin(yaw);
-    vec3 rotated = vec3(c * sp.x + s * sp.z, sp.y, -s * sp.x + c * sp.z);
-    float y = 0.0;
-    if (p.hws.x > 0.0) {
-        vec2 huv = (world_xz - p.hwo) / p.hws;
-        y = texture_sample(grass_heightmap, p.heightmap, huv).r * p.height_scale;
-    }
-    vec3 world = rotated + vec3(world_xz.x, y, world_xz.y);
-    float local_h_norm = (vpos.y - p.pos_min.y) / max(p.pos_extent.y, 1e-3);
-    float sway = sin(world.x * 0.07 + hz_scene.time * 1.3) * cos(world.z * 0.09 + hz_scene.time * 1.1);
-    world.xz += vec2(0.944, 0.330) * (0.15 * local_h_norm * p.wind_response * sway);
+    MaterialFS mat = MaterialFS_unpack(hz_draw_params.material_offset);
+    GrassVertex gv = grass_pull_vertex(mat);
+    vec3 world = grass_apply_wind(gv.world_pos, gv.height_t, mat.wind_response);
     vec4 world_pos = vec4(world, 1.0);
     gl_Position = hz_scene.view_proj * world_pos;
     v_world_pos = world;
-    v_object_pos = vpos;
+    v_object_pos = gv.local_pos;
     v_normal = vec3(0.0, 1.0, 0.0);
     v_tangent = vec3(1.0, 0.0, 0.0);
     v_bitangent_sign = 1.0;
-    v_uv = vuv;
-    v_uv1 = vuv;
+    v_uv = gv.uv;
+    v_uv1 = gv.uv;
     v_color = vec4(1.0);
-    v_material_offset = mo;
+    v_material_offset = hz_draw_params.material_offset;
     v_view_depth = -(hz_scene.view * world_pos).z;
 }
 @end
@@ -825,12 +773,7 @@ ${LIGHTING}
         lit += pbr_point_light(surface, li, light);
     HZ_CLUSTER_LOOP_END
 
-    if (hz_scene.skybox_material_offset != 0xFFFFFFFFu) {
-        uint sky_off = hz_scene.skybox_material_offset;
-        float intensity = uintBitsToFloat(hz_materials.data[sky_off + 4u]);
-        uint cubemap_idx = hz_materials.data[sky_off + 5u];
-        lit += ibl_ambient(surface, li, hz_scene.lights, cubemap_idx, intensity);
-    }
+    lit += ibl_ambient(surface, li);
 ";
 
         // Sibling shadow caster shader, emitted next to the forward LIT/UNLIT

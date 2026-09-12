@@ -127,7 +127,6 @@ public static class HZExportCommands
     [MenuItem("Hz Exporter/Export Shader Graphs")]
     public static void ExportShaderGraphs()
     {
-        string outDir = OutputDir + "/shaders";
         int ok = 0, fail = 0;
         foreach (var shaderName in HZShaderMap.MappedShaderNames())
         {
@@ -135,10 +134,32 @@ public static class HZExportCommands
             if (shader == null) continue;
             var path = AssetDatabase.GetAssetPath(shader);
             if (!path.EndsWith(".shadergraph", System.StringComparison.OrdinalIgnoreCase)) continue;
+            string outDir = ShaderOutDirFor(shaderName);
             try { HZShaderGraphExporter.ExportFile(path, outDir); ok++; }
             catch (System.Exception e) { Debug.LogError($"[HZ-SG] {System.IO.Path.GetFileName(path)}: {e.Message}\n{e.StackTrace}"); fail++; }
         }
         Debug.Log($"[HZ-SG] done — {ok} ok, {fail} failed");
+    }
+
+    /// <summary>Directory a translated ShaderGraph must land in so the engine
+    /// resolves the `shader_source` its materials carry. The mapping's
+    /// engineShader path is authoritative: `/shaders/unity/water.hz.glsl` means
+    /// `<shaderRootDir>/unity/`. Without a configured shader root the shaders
+    /// stage under the output dir instead.</summary>
+    static string ShaderOutDirFor(string unityShaderName)
+    {
+        string root = HZExporter.HZExporterConfig.Instance.ResolvedShaderRootDir();
+        if (string.IsNullOrEmpty(root)) return OutputDir + "/shaders";
+
+        var entry = HZShaderMap.LookupByName(unityShaderName);
+        string enginePath = entry != null ? entry.engineShader : null;
+        // strip the leading "/shaders/" the engine paths carry, keep the subdirs
+        const string prefix = "/shaders/";
+        if (string.IsNullOrEmpty(enginePath) || !enginePath.StartsWith(prefix, System.StringComparison.Ordinal))
+            return root;
+        string rel = enginePath.Substring(prefix.Length);
+        int slash = rel.LastIndexOf('/');
+        return slash < 0 ? root : System.IO.Path.Combine(root, rel.Substring(0, slash));
     }
 
     /// <summary>Test-export a cube with a default URP/Lit material through the grass path,
@@ -519,6 +540,79 @@ public static class HZExportCommands
         const string scenePath =
             "Assets/MagicaCloth2/Example (Can be deleted)/DemoScenes/URP/SkirtDemo.unity";
         UnityEditor.SceneManagement.EditorSceneManager.OpenScene(scenePath,
+            UnityEditor.SceneManagement.OpenSceneMode.Single);
+        ExportScene();
+    }
+
+    // Scene requested by the CLI; empty/missing = export whatever is already open.
+    // RemoteRefresh can only invoke no-arg statics, so the argument arrives here.
+    const string TargetScenePath = "UserSettings/HzExportTarget.txt";
+
+    /// <summary>Export the scene named in UserSettings/HzExportTarget.txt, or the
+    /// active scene when that file is absent or blank. CLI entry point.</summary>
+    public static void ExportTargetScene()
+    {
+        string want = null;
+        try
+        {
+            if (System.IO.File.Exists(TargetScenePath))
+                want = System.IO.File.ReadAllText(TargetScenePath).Trim();
+        }
+        catch (System.Exception e) { Debug.LogWarning($"[HZ] target scene read failed: {e.Message}"); }
+
+        if (!string.IsNullOrEmpty(want))
+        {
+            string path = ResolveScenePath(want);
+            if (path == null)
+            {
+                Debug.LogError($"[HZ] scene not found: '{want}'");
+                return;
+            }
+            if (SceneManager.GetActiveScene().path != path)
+                EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+        }
+        ExportScene();
+    }
+
+    // Accepts a full "Assets/.../x.unity" path or a bare scene name.
+    static string ResolveScenePath(string want)
+    {
+        if (want.EndsWith(".unity", System.StringComparison.OrdinalIgnoreCase)
+            && System.IO.File.Exists(want))
+            return want;
+        string stem = System.IO.Path.GetFileNameWithoutExtension(want);
+        foreach (var guid in AssetDatabase.FindAssets($"t:Scene {stem}"))
+        {
+            string p = AssetDatabase.GUIDToAssetPath(guid);
+            if (string.Equals(System.IO.Path.GetFileNameWithoutExtension(p), stem,
+                              System.StringComparison.OrdinalIgnoreCase))
+                return p;
+        }
+        return null;
+    }
+
+    /// <summary>Engine shadow tint. subtractiveShadowColor only tints shadows in
+    /// Subtractive mixed lighting; under every other mode a realtime shadow receives
+    /// no direct light at all, so the tint is black and ambient/IBL fills it.</summary>
+    static Color ResolveShadowColor()
+    {
+        bool subtractive = false;
+        try
+        {
+            var ls = Lightmapping.lightingSettings;
+            subtractive = ls != null
+                          && ls.mixedBakeMode == MixedLightingMode.Subtractive
+                          && LightmapSettings.lightmaps.Length > 0;
+        }
+        catch (System.Exception) { subtractive = false; } // no LightingSettings asset
+        return subtractive ? LinearToSrgb(RenderSettings.subtractiveShadowColor) : Color.black;
+    }
+
+    /// <summary>Open Idyllic Fantasy Nature scene_day and run the full scene export.</summary>
+    public static void ExportSceneDay()
+    {
+        UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+            "Assets/Idyllic Fantasy Nature/Demo/scene_day.unity",
             UnityEditor.SceneManagement.OpenSceneMode.Single);
         ExportScene();
     }
@@ -1479,7 +1573,7 @@ public static class HZExportCommands
             // Engine applies srgb_to_linear to ambient/shadow color; encode the picker value
             // (raw RenderSettings color, no .linear) so engine recovers what Unity uses.
             Color ambient = LinearToSrgb(RenderSettings.ambientLight);
-            Color shadowCol = LinearToSrgb(RenderSettings.subtractiveShadowColor);
+            Color shadowCol = ResolveShadowColor();
             // When the scene has an IBL env (skybox), the engine's ibl_ambient
             // provides the ambient. Adding the flat ambient_color*intensity on top
             // double-counts (blown-out white). Zero the flat term whenever an env
