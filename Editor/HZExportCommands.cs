@@ -897,6 +897,188 @@ public static class HZExportCommands
         Debug.Log("[HZUA] done");
     }
 
+    /// <summary>Lighting-only capture of every Vegetation material: tints white and the
+    /// texture replaced by a white-RGB copy that keeps its alpha, so coverage is unchanged and
+    /// the frame holds only the graph's lighting term. Divided into the reversed-ramp sum it
+    /// separates texture colour from lighting.</summary>
+    public static void CaptureLightingOnlyProbe() { LightingOnlyCapture("unity_lightonly.png"); }
+
+    /// <summary>The lighting-only capture with every directional light's shadows off, so the
+    /// graph's shadow attenuation is 1 and the frame isolates the ambient part of the term.</summary>
+    public static void CaptureLightingOnlyNoShadowProbe()
+    {
+        var lights = new System.Collections.Generic.List<(Light l, LightShadows s)>();
+        foreach (var l in Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            if (l.type == LightType.Directional) { lights.Add((l, l.shadows)); l.shadows = LightShadows.None; }
+        try { LightingOnlyCapture("unity_lightonly_noshadow.png"); }
+        finally { foreach (var e in lights) e.l.shadows = e.s; }
+        Debug.Log($"[HZLO] shadows restored on {lights.Count} directional light(s)");
+    }
+
+    /// <summary>Lighting-only captures (shadows on and off) with every Vegetation material's
+    /// alpha cutoff at 0, so leaf cards are full quads in both the lit and shadow-caster passes.
+    /// The same condition in the engine isolates caster geometry from alpha-test behaviour.</summary>
+    public static void CaptureCutoffZeroProbe()
+    {
+        var mats = new System.Collections.Generic.List<(Material m, float c)>();
+        foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { "Assets/Idyllic Fantasy Nature/Materials" }))
+        {
+            var m = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
+            if (m == null || m.shader == null || !m.shader.name.Contains("Vegetation") || !m.HasProperty("_Alpha_Cutoff")) continue;
+            mats.Add((m, m.GetFloat("_Alpha_Cutoff")));
+            m.SetFloat("_Alpha_Cutoff", 0f);
+        }
+        try
+        {
+            LightingOnlyCapture("unity_lightonly_cut0.png");
+            var lights = new System.Collections.Generic.List<(Light l, LightShadows s)>();
+            foreach (var l in Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+                if (l.type == LightType.Directional) { lights.Add((l, l.shadows)); l.shadows = LightShadows.None; }
+            try { LightingOnlyCapture("unity_lightonly_noshadow_cut0.png"); }
+            finally { foreach (var e in lights) e.l.shadows = e.s; }
+        }
+        finally { foreach (var e in mats) e.m.SetFloat("_Alpha_Cutoff", e.c); }
+        Debug.Log($"[HZC0] cutoff-0 captures done; restored cutoff on {mats.Count} materials");
+    }
+
+    static void LightingOnlyCapture(string file)
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZLO] no main camera"); return; }
+        var mats = new System.Collections.Generic.List<Material>();
+        foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { "Assets/Idyllic Fantasy Nature/Materials" }))
+        {
+            var m = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
+            if (m == null || m.shader == null || !m.shader.name.Contains("Vegetation")) continue;
+            if (!m.HasProperty("_Top_Color") || !m.HasProperty("_Bottom_Color") || !m.HasProperty("_Texture")) continue;
+            mats.Add(m);
+        }
+        var whites = new System.Collections.Generic.Dictionary<Texture, Texture2D>();
+        var sb = new Color[mats.Count]; var st = new Color[mats.Count]; var stex = new Texture[mats.Count];
+        for (int i = 0; i < mats.Count; i++)
+        {
+            sb[i] = mats[i].GetColor("_Bottom_Color"); st[i] = mats[i].GetColor("_Top_Color"); stex[i] = mats[i].GetTexture("_Texture");
+            if (stex[i] != null && !whites.ContainsKey(stex[i])) whites[stex[i]] = WhiteRgbKeepAlpha(stex[i]);
+            mats[i].SetColor("_Bottom_Color", Color.white); mats[i].SetColor("_Top_Color", Color.white);
+            if (stex[i] != null) mats[i].SetTexture("_Texture", whites[stex[i]]);
+        }
+        ShootPlain(cam, $"{ABDir}/{file}");
+        for (int i = 0; i < mats.Count; i++)
+        {
+            mats[i].SetColor("_Bottom_Color", sb[i]); mats[i].SetColor("_Top_Color", st[i]); mats[i].SetTexture("_Texture", stex[i]);
+        }
+        foreach (var w in whites.Values) Object.DestroyImmediate(w);
+        Debug.Log($"[HZLO] probed {mats.Count} materials; restored");
+    }
+
+    static Texture2D WhiteRgbKeepAlpha(Texture src)
+    {
+        var rt = RenderTexture.GetTemporary(src.width, src.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+        Graphics.Blit(src, rt);
+        var prev = RenderTexture.active;
+        RenderTexture.active = rt;
+        var t = new Texture2D(src.width, src.height, TextureFormat.RGBA32, true, true) { hideFlags = HideFlags.DontSave };
+        t.ReadPixels(new Rect(0, 0, src.width, src.height), 0, 0);
+        RenderTexture.active = prev;
+        RenderTexture.ReleaseTemporary(rt);
+        var px = t.GetPixels32();
+        for (int i = 0; i < px.Length; i++) { px[i].r = 255; px[i].g = 255; px[i].b = 255; }
+        t.SetPixels32(px);
+        t.filterMode = src.filterMode; t.wrapMode = src.wrapMode; t.anisoLevel = src.anisoLevel;
+        t.Apply(true);
+        return t;
+    }
+
+    /// <summary>For every LODGroup in the main camera's frustum, report which LOD Unity
+    /// renders from this viewpoint (relative screen height vs transition heights, with
+    /// lodBias) and the mesh at each level.</summary>
+    public static void DumpVisibleTreeLods()
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZLD] no main camera"); return; }
+        var planes = GeometryUtility.CalculateFrustumPlanes(cam);
+        float halfAngle = Mathf.Tan(Mathf.Deg2Rad * cam.fieldOfView * 0.5f);
+        Debug.Log($"[HZLD] lodBias={QualitySettings.lodBias} maxLOD={QualitySettings.maximumLODLevel} fov={cam.fieldOfView}");
+        foreach (var g in Object.FindObjectsByType<LODGroup>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            var lods = g.GetLODs();
+            if (lods.Length == 0 || lods[0].renderers.Length == 0 || lods[0].renderers[0] == null) continue;
+            if (!GeometryUtility.TestPlanesAABB(planes, lods[0].renderers[0].bounds)) continue;
+            var sc = g.transform.lossyScale;
+            float size = g.size * Mathf.Max(Mathf.Abs(sc.x), Mathf.Abs(sc.y), Mathf.Abs(sc.z));
+            float dist = Vector3.Distance(g.transform.TransformPoint(g.localReferencePoint), cam.transform.position);
+            float rel = size * 0.5f / (dist * halfAngle) * QualitySettings.lodBias;
+            int active = -1;
+            for (int i = 0; i < lods.Length; i++) if (rel >= lods[i].screenRelativeTransitionHeight) { active = i; break; }
+            var sbd = new System.Text.StringBuilder();
+            for (int i = 0; i < lods.Length; i++)
+            {
+                var r = lods[i].renderers.Length > 0 ? lods[i].renderers[0] : null;
+                var mf = r != null ? r.GetComponent<MeshFilter>() : null;
+                sbd.Append($"L{i}(>{lods[i].screenRelativeTransitionHeight:F3} {(mf != null && mf.sharedMesh != null ? mf.sharedMesh.name : "-")}) ");
+            }
+            Debug.Log($"[HZLD] '{g.name}' dist={dist:F1} size={size:F2} rel={rel:F3} active=L{active} {sbd}");
+        }
+        Debug.Log("[HZLD] done");
+    }
+
+    /// <summary>List the Vegetation renderers whose screen-space bounds overlap the broadleaf
+    /// canopy measurement rect (0,0)-(1250,300) of the 1920x1080 capture, with their LODGroup,
+    /// LOD level and distance, so a region's numbers can be tied to what draws it.</summary>
+    public static void DumpCanopyRectRenderers()
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZCR] no main camera"); return; }
+        var lodOf = new System.Collections.Generic.Dictionary<Renderer, string>();
+        foreach (var g in Object.FindObjectsByType<LODGroup>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            var lods = g.GetLODs();
+            for (int i = 0; i < lods.Length; i++)
+                foreach (var r in lods[i].renderers) if (r != null) lodOf[r] = $"{g.name}:L{i}";
+        }
+        foreach (var r in Object.FindObjectsByType<Renderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (!r.enabled) continue;
+            string vegMat = null;
+            foreach (var sm in r.sharedMaterials)
+                if (sm != null && sm.shader != null && sm.shader.name.Contains("Vegetation")) { vegMat = sm.name; break; }
+            if (vegMat == null) continue;
+            var b = r.bounds;
+            float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f; int behind = 0;
+            for (int k = 0; k < 8; k++)
+            {
+                var c = new Vector3((k & 1) != 0 ? b.max.x : b.min.x, (k & 2) != 0 ? b.max.y : b.min.y, (k & 4) != 0 ? b.max.z : b.min.z);
+                var vp = cam.WorldToViewportPoint(c);
+                if (vp.z <= cam.nearClipPlane) { behind++; continue; }
+                float px = vp.x * 1920f, py = (1f - vp.y) * 1080f;
+                x0 = Mathf.Min(x0, px); x1 = Mathf.Max(x1, px); y0 = Mathf.Min(y0, py); y1 = Mathf.Max(y1, py);
+            }
+            if (behind == 8 || x1 < 0 || x0 > 1250 || y1 < 0 || y0 > 300) continue;
+            var mf = r.GetComponent<MeshFilter>();
+            string lod = lodOf.TryGetValue(r, out var l) ? l : "no-LODGroup";
+            float dist = Vector3.Distance(b.center, cam.transform.position);
+            Debug.Log($"[HZCR] go='{r.gameObject.name}' root='{r.transform.root.name}' mat='{vegMat}' behindCorners={behind} mesh='{(mf != null && mf.sharedMesh != null ? mf.sharedMesh.name : "-")}' {lod} dist={dist:F1} screen=({x0:F0},{y0:F0})-({x1:F0},{y1:F0})");
+        }
+        Debug.Log("[HZCR] done");
+    }
+
+    /// <summary>Shadow casting mode of every renderer in the canopy trees' LODGroups, so
+    /// the exported casts_shadow can be checked against what Unity actually draws into the map.</summary>
+    public static void DumpTreeShadowCasting()
+    {
+        var names = new System.Collections.Generic.HashSet<string> { "Tree_02 (5)", "Tree_03 (2)", "WillowTree_03 (1)", "Fir_01" };
+        foreach (var g in Object.FindObjectsByType<LODGroup>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (!names.Contains(g.name)) continue;
+            var lods = g.GetLODs();
+            for (int i = 0; i < lods.Length; i++)
+                foreach (var r in lods[i].renderers)
+                    if (r != null)
+                        Debug.Log($"[HZSC] '{g.name}' L{i} go='{r.gameObject.name}' shadowCastingMode={r.shadowCastingMode} receiveShadows={r.receiveShadows} enabled={r.enabled} mats=[{string.Join(",", System.Array.ConvertAll(r.sharedMaterials, m => m != null ? m.name : "null"))}]");
+        }
+        Debug.Log("[HZSC] done");
+    }
+
     static void ShootPlain(Camera cam, string path)
     {
         var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32,
