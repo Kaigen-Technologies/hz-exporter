@@ -1079,6 +1079,49 @@ public static class HZExportCommands
         Debug.Log("[HZSC] done");
     }
 
+    /// <summary>Report where Unity's ambient comes from, then prove whether the live ambient
+    /// probe follows the skybox: sample it, remove the skybox and regenerate, restore and
+    /// regenerate. Leaves the probe regenerated from the restored skybox.</summary>
+    public static void ProbeAmbientSource()
+    {
+        var dirs = new[] { Vector3.up, Vector3.forward, Vector3.down };
+        string Eval(string tag)
+        {
+            var outc = new Color[3];
+            RenderSettings.ambientProbe.Evaluate(dirs, outc);
+            return $"{tag}: up=({outc[0].r:F3},{outc[0].g:F3},{outc[0].b:F3}) horizon=({outc[1].r:F3},{outc[1].g:F3},{outc[1].b:F3}) down=({outc[2].r:F3},{outc[2].g:F3},{outc[2].b:F3})";
+        }
+        Debug.Log($"[HZAM] ambientMode={RenderSettings.ambientMode} intensity={RenderSettings.ambientIntensity} skybox={(RenderSettings.skybox ? RenderSettings.skybox.name : "null")} sky={RenderSettings.ambientSkyColor} reflMode={RenderSettings.defaultReflectionMode} reflIntensity={RenderSettings.reflectionIntensity} customRefl={(RenderSettings.customReflectionTexture ? RenderSettings.customReflectionTexture.name : "null")}");
+        Debug.Log($"[HZAM] lightingDataAsset={(Lightmapping.lightingDataAsset ? Lightmapping.lightingDataAsset.name : "null")} lightmaps={LightmapSettings.lightmaps.Length} giWorkflow={Lightmapping.giWorkflowMode} isRunning={Lightmapping.isRunning}");
+        Debug.Log("[HZAM] " + Eval("P0 current"));
+        var sky = RenderSettings.skybox;
+        RenderSettings.skybox = null;
+        Debug.Log("[HZAM] " + Eval("P1 skybox=null, no update"));
+        DynamicGI.UpdateEnvironment();
+        Debug.Log("[HZAM] " + Eval("P2 skybox=null, UpdateEnvironment"));
+        RenderSettings.skybox = sky;
+        DynamicGI.UpdateEnvironment();
+        Debug.Log("[HZAM] " + Eval("P3 skybox restored, UpdateEnvironment"));
+    }
+
+    /// <summary>Report the default reflection source Unity binds when no lighting has been
+    /// generated, so specular IBL parity can be judged the same way as the ambient probe.</summary>
+    public static void DumpDefaultReflection()
+    {
+        var t = ReflectionProbe.defaultTexture;
+        Debug.Log($"[HZRF] defaultReflection={(t ? t.name : "null")} dim={(t ? t.dimension.ToString() : "-")} size={(t ? t.width + "x" + t.height : "-")} mips={(t ? t.mipmapCount : 0)} hdr={ReflectionProbe.defaultTextureHDRDecodeValues} probes={Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None).Length}");
+        if (t is Cubemap cube)
+        {
+            var rt = RenderTexture.GetTemporary(8, 8, 0, RenderTextureFormat.ARGBFloat);
+            Graphics.CopyTexture(cube, 2, Mathf.Max(0, cube.mipmapCount - 1), rt, 0, 0);
+            var prev = RenderTexture.active; RenderTexture.active = rt;
+            var tex = new Texture2D(1, 1, TextureFormat.RGBAFloat, false);
+            tex.ReadPixels(new Rect(0, 0, 1, 1), 0, 0); RenderTexture.active = prev;
+            Debug.Log($"[HZRF] +Y face last mip texel = {tex.GetPixel(0, 0)}");
+            Object.DestroyImmediate(tex); RenderTexture.ReleaseTemporary(rt);
+        }
+    }
+
     static void ShootPlain(Camera cam, string path)
     {
         var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32,
@@ -1316,6 +1359,34 @@ public static class HZExportCommands
     // `shadowDistance`), not QualitySettings.shadowDistance which is the legacy/built-in path and
     // is ignored under SRP. Read via reflection to avoid a hard URP assembly reference; falls back
     // to QualitySettings when no SRP asset is active.
+    /// <summary>URP cascade count and cumulative split fractions of the shadow distance.</summary>
+    static void ResolveShadowLayout(UniversalRenderPipelineAsset urp, out uint count, out Vector3 splits)
+    {
+        count = 0; splits = Vector3.zero;
+        if (urp == null) return;
+        count = (uint)urp.shadowCascadeCount;
+        if (count == 2) splits = new Vector3(urp.cascade2Split, 0f, 0f);
+        else if (count == 3) splits = new Vector3(urp.cascade3Split.x, urp.cascade3Split.y, 0f);
+        else if (count == 4) splits = urp.cascade4Split;
+    }
+
+    /// <summary>Main light's effective soft-shadow tier as engine ShadowFilterQuality; the engine's widest kernel is 5x5, so URP Medium and High both map to high.</summary>
+    static uint ResolveShadowFilter(UniversalRenderPipelineAsset urp)
+    {
+        Light sun = RenderSettings.sun;
+        if (sun == null)
+            foreach (var l in Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+                if (l.type == LightType.Directional) { sun = l; break; }
+        if (urp == null || sun == null || sun.shadows == LightShadows.None) return 0u;
+        if (!urp.supportsSoftShadows || sun.shadows == LightShadows.Hard) return 1u;
+        var quality = sun.TryGetComponent<UniversalAdditionalLightData>(out var data)
+            ? data.softShadowQuality : SoftShadowQuality.UsePipelineSettings;
+        // the asset-level quality is internal in URP, so read its serialized field
+        if (quality == SoftShadowQuality.UsePipelineSettings)
+            quality = (SoftShadowQuality)new SerializedObject(urp).FindProperty("m_SoftShadowQuality").intValue;
+        return quality == SoftShadowQuality.Low ? 2u : 3u;
+    }
+
     static float ActiveShadowDistance()
     {
         var rp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline;
@@ -2080,8 +2151,12 @@ public static class HZExportCommands
                         info.lightIntensity = light.intensity;
                         info.castShadow = light.shadows != LightShadows.None;
                         info.shadowStrength = light.shadowStrength;
-                        info.shadowBias = light.shadowBias;
-                        info.shadowNormalBias = light.shadowNormalBias;
+                        // URP uses the pipeline asset's bias unless the light opts out of pipeline settings
+                        var biasAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+                        bool lightBias = biasAsset == null ||
+                            (light.TryGetComponent<UniversalAdditionalLightData>(out var urpLightData) && !urpLightData.usePipelineSettings);
+                        info.shadowBias = lightBias ? light.shadowBias : biasAsset.shadowDepthBias;
+                        info.shadowNormalBias = lightBias ? light.shadowNormalBias : biasAsset.shadowNormalBias;
                         Debug.Log($"[HZ] Entity: {go.name} (directional light, shadows={info.castShadow})");
                     }
                     else if (light.type == LightType.Point)
@@ -2182,16 +2257,19 @@ public static class HZExportCommands
 
         bool wantsSkybox = cameraUsesSkybox && effectiveSky != null;
         bool wantsEnv = wantsSkybox || ambientFromSky || reflFromCustom || reflFromSky;
+        // Unity has skybox ambient and reflections only after Generate Lighting; until then both are black
+        bool lightingGenerated = Lightmapping.lightingDataAsset != null;
         string envAssetPath = null;
-        float envIntensity = 1.0f;
+        float envDiffuse = 0f, envSpecular = 0f;
         if (wantsEnv)
         {
             string hdrPath = $"{OutputDir}/environments/{sceneName}_skybox.hdr";
             if (HZSkyboxExporter.Export(hdrPath))
             {
                 envAssetPath = $"{AssetPrefix}/environments/{sceneName}_skybox.hza";
-                envIntensity = ambientFromSky ? RenderSettings.ambientIntensity
-                                              : RenderSettings.reflectionIntensity;
+                envDiffuse = ambientFromSky && lightingGenerated ? RenderSettings.ambientIntensity : 0f;
+                envSpecular = reflFromCustom || (reflFromSky && lightingGenerated)
+                    ? RenderSettings.reflectionIntensity : 0f;
             }
         }
         if (!wantsEnv)
@@ -2203,15 +2281,11 @@ public static class HZExportCommands
             // (raw RenderSettings color, no .linear) so engine recovers what Unity uses.
             Color ambient = RenderSettings.ambientLight; // picker value; engine linearises
             Color shadowCol = ResolveShadowColor();
-            // When the scene has an IBL env (skybox), the engine's ibl_ambient
-            // provides the ambient. Adding the flat ambient_color*intensity on top
-            // double-counts (blown-out white). Zero the flat term whenever an env
-            // is present; scenes without a skybox keep their flat ambient.
+            // Skybox ambient exists only as the env diffuse term; Flat/Trilight ambientLight IS the ambient
             float flatAmbientIntensity =
-                envAssetPath != null ? 0f
-                : RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Skybox
-                      ? RenderSettings.ambientIntensity
-                      : 1.0f; // Flat/Trilight: ambientLight IS the ambient
+                RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Skybox ? 0f : 1.0f;
+            var shadowAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            ResolveShadowLayout(shadowAsset, out uint cascadeCount, out Vector3 cascadeSplits);
             // Unity FogMode: Linear=1, Exponential=2, ExponentialSquared=3 — same numbers as RendererFogMode.
             uint fogMode = RenderSettings.fog ? (uint)RenderSettings.fogMode : 0u;
             // RenderSettings.fogColor already comes back in the space the engine
@@ -2238,7 +2312,12 @@ public static class HZExportCommands
                 postProcessing = ReadPostProcessing(),
                 hasEnv = envAssetPath != null,
                 envAssetPath = envAssetPath,
-                envIntensity = envIntensity,
+                envIntensity = envDiffuse,
+                envSpecularIntensity = envSpecular,
+                skyboxIntensity = 1.0f, // the exported HDR is rendered from Unity's skybox, exposure included
+                shadowCascadeCount = cascadeCount,
+                shadowCascadeSplits = cascadeSplits,
+                shadowFilter = ResolveShadowFilter(shadowAsset),
                 skybox = wantsSkybox,
                 clearColor = clearCol,
                 fogMode = fogMode,

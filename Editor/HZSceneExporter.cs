@@ -157,7 +157,12 @@ namespace HZExporter
             // Skybox / IBL env (only meaningful when isSceneSettings == true)
             public bool hasEnv;
             public string envAssetPath;   // e.g. "unity/environments/SceneA_skybox.hza"
-            public float envIntensity;
+            public float envIntensity;          // diffuse IBL
+            public float envSpecularIntensity;
+            public float skyboxIntensity;
+            public uint shadowCascadeCount;
+            public Vector3 shadowCascadeSplits; // cumulative fractions of the shadow distance
+            public uint shadowFilter;           // engine ShadowFilterQuality: 0 keep, 1 hard, 2 low, 3 high
             public bool skybox;           // true only if the main camera clears to Skybox
             public Color clearColor;      // main camera background color (used when skybox == false)
             // Fog (only meaningful when isSceneSettings == true)
@@ -510,14 +515,21 @@ namespace HZExporter
                 sb.AppendLine($"  fog_density {F(info.fogDensity)}");
                 sb.AppendLine($"  fog_start {F(info.fogStart)}");
                 sb.AppendLine($"  fog_end {F(info.fogEnd)}");
-                // clear_color is the LAST field in the engine EcsSceneSettings struct;
-                // the .hzt reader advances by struct offset, so it must be emitted last
-                // (emitting it before fog_* makes the reader skip the fog fields → 0).
+                // the .hzt reader matches fields forward only: emit in engine struct order
                 sb.AppendLine("  clear_color");
                 sb.AppendLine($"    r {F(info.clearColor.r)}");
                 sb.AppendLine($"    g {F(info.clearColor.g)}");
                 sb.AppendLine($"    b {F(info.clearColor.b)}");
                 sb.AppendLine($"    a {F(info.clearColor.a)}");
+                sb.AppendLine("  env_specular_override true");
+                sb.AppendLine($"  env_specular_intensity {F(info.envSpecularIntensity)}");
+                sb.AppendLine($"  skybox_intensity {F(info.skyboxIntensity)}");
+                sb.AppendLine($"  shadow_cascade_count {info.shadowCascadeCount}");
+                sb.AppendLine("  shadow_cascade_splits");
+                sb.AppendLine($"    x {F(info.shadowCascadeSplits.x)}");
+                sb.AppendLine($"    y {F(info.shadowCascadeSplits.y)}");
+                sb.AppendLine($"    z {F(info.shadowCascadeSplits.z)}");
+                sb.AppendLine($"  shadow_filter {info.shadowFilter}");
 
                 // EcsPostProcessing — singleton color-grading/tonemap/vignette config, emitted on
                 // the scene-settings entity (same pattern as EcsSceneSettings). Values come from the
