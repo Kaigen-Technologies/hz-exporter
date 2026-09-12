@@ -605,7 +605,69 @@ public static class HZExportCommands
                           && LightmapSettings.lightmaps.Length > 0;
         }
         catch (System.Exception) { subtractive = false; } // no LightingSettings asset
-        return subtractive ? LinearToSrgb(RenderSettings.subtractiveShadowColor) : Color.black;
+        return subtractive ? RenderSettings.subtractiveShadowColor : Color.black;
+    }
+
+    const string ABDir = "/Users/gabrieldechichi/dev/gabrieldechichi/hz-demos/references";
+
+    /// <summary>Render the main camera to a RT twice -- SSAO on, then off -- so the
+    /// feature's actual pixel contribution is measured instead of assumed.</summary>
+    public static void CaptureSSAOCompare()
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZAB] no main camera"); return; }
+        var feat = FindSSAOFeature();
+        if (feat == null) { Debug.LogError("[HZAB] no SSAO renderer feature"); return; }
+
+        bool was = feat.isActive;
+        Shoot(cam, $"{ABDir}/unity_ssao_on.png", feat, true);
+        Shoot(cam, $"{ABDir}/unity_ssao_off.png", feat, false);
+        feat.SetActive(was);
+        Debug.Log($"[HZAB] done; SSAO restored to {was}");
+    }
+
+    static UnityEngine.Rendering.Universal.ScriptableRendererFeature FindSSAOFeature()
+    {
+        var urp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        if (urp == null) return null;
+        var so = new UnityEditor.SerializedObject(urp);
+        var list = so.FindProperty("m_RendererDataList");
+        for (int i = 0; list != null && i < list.arraySize; i++)
+        {
+            var rd = list.GetArrayElementAtIndex(i).objectReferenceValue;
+            if (rd == null) continue;
+            var feats = new UnityEditor.SerializedObject(rd).FindProperty("m_RendererFeatures");
+            for (int f = 0; feats != null && f < feats.arraySize; f++)
+            {
+                var fo = feats.GetArrayElementAtIndex(f).objectReferenceValue
+                         as UnityEngine.Rendering.Universal.ScriptableRendererFeature;
+                if (fo != null && fo.GetType().Name.Contains("ScreenSpaceAmbientOcclusion")) return fo;
+            }
+        }
+        return null;
+    }
+
+    static void Shoot(Camera cam, string path,
+                      UnityEngine.Rendering.Universal.ScriptableRendererFeature feat, bool on)
+    {
+        feat.SetActive(on);
+        var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32,
+                                   RenderTextureReadWrite.sRGB) { antiAliasing = 1 };
+        var req = new UnityEngine.Rendering.RenderPipeline.StandardRequest { destination = rt };
+        if (!UnityEngine.Rendering.RenderPipeline.SupportsRenderRequest(cam, req))
+        { Debug.LogError("[HZAB] render request unsupported"); return; }
+        UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cam, req);
+
+        var prev = RenderTexture.active;
+        RenderTexture.active = rt;
+        var tex = new Texture2D(1920, 1080, TextureFormat.RGBA32, false);
+        tex.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0);
+        tex.Apply();
+        RenderTexture.active = prev;
+        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        rt.Release(); Object.DestroyImmediate(rt);
+        Debug.Log($"[HZAB] wrote {path} (ssao={on})");
     }
 
     /// <summary>Dump URP renderer features (SSAO) and the active volume stack.</summary>
@@ -1552,9 +1614,11 @@ public static class HZExportCommands
                 // Lights
                 else if (go.TryGetComponent<Light>(out var light))
                 {
-                    // Engine applies srgb_to_linear to light color; encode the picker value
-                    // (light.color, raw) so the engine recovers what Unity uses internally.
-                    Color c = LinearToSrgb(light.color);
+                    // light.color IS the picker (sRGB) value and Unity's shaders use
+                    // light.color.linear, so pass it RAW: the engine's srgb_to_linear
+                    // then reproduces exactly what URP uses. LinearToSrgb here would
+                    // double-encode (measured: sun 1.00/1.06/1.25x too bright in R/G/B).
+                    Color c = light.color;
                     if (light.type == LightType.Directional)
                     {
                         Vector3 fwd = t.forward;
@@ -1685,7 +1749,7 @@ public static class HZExportCommands
         {
             // Engine applies srgb_to_linear to ambient/shadow color; encode the picker value
             // (raw RenderSettings color, no .linear) so engine recovers what Unity uses.
-            Color ambient = LinearToSrgb(RenderSettings.ambientLight);
+            Color ambient = RenderSettings.ambientLight; // picker value; engine linearises
             Color shadowCol = ResolveShadowColor();
             // When the scene has an IBL env (skybox), the engine's ibl_ambient
             // provides the ambient. Adding the flat ambient_color*intensity on top
