@@ -43,6 +43,12 @@ namespace HZExporter.ShaderGraph
         // `mat.<field>` (since `mat` isn't in scope inside a function).
         public bool IsSubGraph;
 
+        // True when lowering the grass-SSBO variant. Unity's terrain-detail
+        // instancing supplies TEXCOORD3 as a root->tip blade factor (measured:
+        // the graph's UV3-driven colour overlay ramps 0 at the root to 1 at the
+        // tip), which the grass pull exposes as the normalized local height.
+        public bool IsGrass;
+
         // Prefix for newly-emitted temp names. Defaults to `_n`. Per-branch
         // KeywordNode contexts override this to `_b<idx>_n` so branch-local
         // temps never collide with outer or sibling-branch names.
@@ -416,16 +422,22 @@ namespace HZExporter.ShaderGraph
             {
                 case 0: source = uv0; break;
                 case 1: source = uv1; break;
-                // UV2/UV3 aren't carried by the engine vertex layout, so they
-                // fall back to UV0. Emitting zero instead collapses anything
-                // that reads them (e.g. vegetation's UV3-driven color overlay)
-                // to a constant, which is more visibly broken than reusing UV0.
-                // LogWarning stays loud so we notice — if a mesh ever carries
-                // real UV2/UV3 data, that data is lost (HZGlbWriter logs the
-                // dropped channel separately).
+                // UV2/UV3 aren't in the engine vertex layout. Zero is not a
+                // fallback here, it is what Unity itself rasterizes: a mesh
+                // that declares no TEXCOORD2/3 leaves the attribute unbound and
+                // the stage reads (0,0,0,0). Substituting UV0 invents a
+                // gradient Unity never draws (measured on the terrain-detail
+                // grass, whose meshes carry TexCoord0 only).
+                case 3 when ctx.IsGrass:
+                    // Unity's terrain-detail instancing feeds TEXCOORD3 a
+                    // root->tip blade factor; grass_terrain_pull exposes the
+                    // same quantity. Only .y is meaningful, matching the graph.
+                    source = ctx.IsVertexStage
+                        ? "vec2(0.0, gv.height_t)"
+                        : "vec2(0.0, (v_object_pos.y - mat.pos_min.y) / max(mat.pos_extent.y, 1e-3))";
+                    break;
                 case 2: case 3:
-                    UnityEngine.Debug.LogWarning($"[SgLowering] UV channel {channel} not plumbed in engine vertex layout — falling back to UV0 in UVNode '{node.Id}' (stage={(ctx.IsVertexStage ? "vs" : "fs")}). If a mesh carries real UV{channel}, that data is lost.");
-                    source = $"{uv0} /* TODO: UV channel {channel} not plumbed; falling back to UV0 */";
+                    source = $"vec2(0.0) /* UV{channel}: not in vertex layout; Unity reads unbound TEXCOORD{channel} as 0 */";
                     break;
                 default: throw new NotImplementedException($"UV channel {channel} not wired");
             }
@@ -540,7 +552,7 @@ namespace HZExporter.ShaderGraph
             foreach (var n in sg.Nodes.Values) if (n.Type == "SubGraphOutputNode") { sgOut = n; break; }
             if (sgOut == null) throw new System.Exception($"subgraph {guid} has no SubGraphOutputNode");
 
-            var fnCtx = new LowerCtx(sg) { IsVertexStage = ctx.IsVertexStage, IsSubGraph = true };
+            var fnCtx = new LowerCtx(sg) { IsVertexStage = ctx.IsVertexStage, IsSubGraph = true, IsGrass = ctx.IsGrass };
 
             // Subgraph properties become function parameters. PropertyNode
             // inside the subgraph body will reference them as bare names.
@@ -887,6 +899,7 @@ namespace HZExporter.ShaderGraph
             {
                 IsVertexStage = parentCtx.IsVertexStage,
                 IsSubGraph = parentCtx.IsSubGraph,
+                IsGrass = parentCtx.IsGrass,
                 TempPrefix = $"{parentPath}_b{idx}_n",
             };
             // Lower the value flowing into the branch's input slot. This may

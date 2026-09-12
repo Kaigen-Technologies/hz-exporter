@@ -127,7 +127,7 @@ namespace HZExporter.ShaderGraph
         static string EmitFromTemplate(SgGraph g, string template, bool isLit, bool grass = false)
         {
             // ----- vertex stage --------------------------------------------
-            var vsCtx = new LowerCtx(g) { IsVertexStage = true };
+            var vsCtx = new LowerCtx(g) { IsVertexStage = true, IsGrass = grass };
             var vsAssigns = new List<Assign>();
             string vsPos     = LowerVertexBlock(g, vsCtx, vsAssigns, "Position", "vertex_position", "v.pos");
             string vsNormal  = LowerVertexBlock(g, vsCtx, vsAssigns, "Normal",   "vertex_normal",   "v.normal");
@@ -135,7 +135,7 @@ namespace HZExporter.ShaderGraph
             SgOptimize.Run(vsCtx.Statements, vsAssigns);
 
             // ----- fragment stage ------------------------------------------
-            var ctx = new LowerCtx(g);
+            var ctx = new LowerCtx(g) { IsGrass = grass };
             var assigns = new List<Assign>();
 
             assigns.Add(LowerSurface(g, ctx, "BaseColor", "base_color", SgType.Vec3, Sg.LitConst(SgConst.Vec(SgType.Vec3, 0.5, 0.5, 0.5))));

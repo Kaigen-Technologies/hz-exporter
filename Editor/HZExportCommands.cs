@@ -608,6 +608,88 @@ public static class HZExportCommands
         return subtractive ? RenderSettings.subtractiveShadowColor : Color.black;
     }
 
+    /// <summary>Report UV channel contents of the terrain detail (grass) meshes, so the
+    /// translation uses the channel Unity's graph actually reads instead of guessing.</summary>
+    public static void DumpGrassUVs()
+    {
+        foreach (var t in Object.FindObjectsByType<Terrain>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            var protos = t.terrainData.detailPrototypes;
+            for (int i = 0; i < protos.Length; i++)
+            {
+                var m = protos[i].prototype != null
+                    ? protos[i].prototype.GetComponentInChildren<MeshFilter>()?.sharedMesh : null;
+                if (m == null) { Debug.Log($"[HZUV] proto{i} usePrototypeMesh={protos[i].usePrototypeMesh} mesh=<none> (texture billboard)"); continue; }
+                var uv0=new System.Collections.Generic.List<Vector4>();
+                var uv3=new System.Collections.Generic.List<Vector4>();
+                m.GetUVs(0, uv0); m.GetUVs(3, uv3);
+                string r3 = "<empty>";
+                if (uv3.Count > 0) {
+                    float mnx=9e9f,mxx=-9e9f,mny=9e9f,mxy=-9e9f;
+                    foreach (var v in uv3){ mnx=Mathf.Min(mnx,v.x); mxx=Mathf.Max(mxx,v.x); mny=Mathf.Min(mny,v.y); mxy=Mathf.Max(mxy,v.y); }
+                    r3=$"n={uv3.Count} x=[{mnx:F3},{mxx:F3}] y=[{mny:F3},{mxy:F3}]";
+                }
+                Debug.Log($"[HZUV] proto{i} mesh='{m.name}' verts={m.vertexCount} uv0n={uv0.Count} uv3: {r3}");
+            }
+            break;
+        }
+    }
+
+    /// <summary>Report exactly what Unity feeds the grass: detail-prototype render path,
+    /// which UV channels the prototype meshes actually declare, and the colour values the
+    /// material hands the shader (vs what is serialized).</summary>
+    public static void DumpGrassTruth()
+    {
+        Debug.Log($"[HZGT] colorspace={QualitySettings.activeColorSpace} gamma_kw={Shader.IsKeywordEnabled("UNITY_COLORSPACE_GAMMA")}");
+        foreach (var t in Object.FindObjectsByType<Terrain>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            Debug.Log($"[HZGT] terrain='{t.name}' drawInstanced={t.drawInstanced} detailDensity={t.detailObjectDensity} detailDistance={t.detailObjectDistance}");
+            var protos = t.terrainData.detailPrototypes;
+            for (int i = 0; i < protos.Length; i++)
+            {
+                var p = protos[i];
+                var go = p.prototype;
+                var mr = go != null ? go.GetComponentInChildren<MeshRenderer>() : null;
+                var mf = go != null ? go.GetComponentInChildren<MeshFilter>() : null;
+                var m  = mf != null ? mf.sharedMesh : null;
+                string matName = mr != null && mr.sharedMaterial != null ? mr.sharedMaterial.name : "<none>";
+                string attrs = "<no mesh>";
+                if (m != null)
+                {
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var a in m.GetVertexAttributes())
+                        sb.Append(a.attribute).Append('(').Append(a.dimension).Append(") ");
+                    attrs = sb.ToString();
+                }
+                Debug.Log($"[HZGT] proto{i} proto='{(go!=null?go.name:"<null>")}' mat='{matName}' mesh='{(m!=null?m.name:"<null>")}' "
+                        + $"renderMode={p.renderMode} usePrototypeMesh={p.usePrototypeMesh} useInstancing={p.useInstancing} "
+                        + $"healthy={p.healthyColor} dry={p.dryColor} noiseSpread={p.noiseSpread} "
+                        + $"w=[{p.minWidth:F3},{p.maxWidth:F3}] h=[{p.minHeight:F3},{p.maxHeight:F3}] density={p.density} "
+                        + $"alignToGround={p.alignToGround} positionJitter={p.positionJitter} useDensityScaling={p.useDensityScaling} "
+                        + $"attrs=[{attrs}]");
+                if (mr != null && mr.sharedMaterial != null) DumpGrassMatColors(mr.sharedMaterial);
+            }
+            break;
+        }
+        foreach (var name in new[] { "Grass_01", "Grass_02", "Grass_03" })
+        {
+            var mat = AssetDatabase.LoadAssetAtPath<Material>($"Assets/Idyllic Fantasy Nature/Materials/Grass/{name}.mat");
+            if (mat != null) DumpGrassMatColors(mat);
+        }
+    }
+
+    static void DumpGrassMatColors(Material mat)
+    {
+        foreach (var prop in new[] { "_Top_Color", "_Bottom_Color" })
+        {
+            if (!mat.HasProperty(prop)) { Debug.Log($"[HZGT]   {mat.name}.{prop} <absent>"); continue; }
+            Color c = mat.GetColor(prop);
+            Debug.Log($"[HZGT]   {mat.name}.{prop} get=({c.r:F6},{c.g:F6},{c.b:F6}) linear=({c.linear.r:F6},{c.linear.g:F6},{c.linear.b:F6}) gamma=({c.gamma.r:F6},{c.gamma.g:F6},{c.gamma.b:F6})");
+        }
+        foreach (var prop in new[] { "_Blend_Height", "_Custom_Color", "_Enable_Top_Color", "_Alpha_Cutoff" })
+            if (mat.HasProperty(prop)) Debug.Log($"[HZGT]   {mat.name}.{prop} = {mat.GetFloat(prop):F6}");
+    }
+
     const string ABDir = "/Users/gabrieldechichi/dev/gabrieldechichi/hz-demos/references";
 
     /// <summary>Render the main camera to a RT twice -- SSAO on, then off -- so the
@@ -645,6 +727,78 @@ public static class HZExportCommands
             }
         }
         return null;
+    }
+
+    /// <summary>Report every non-terrain renderer using the Vegetation graph: whether its
+    /// mesh actually carries UV3, and which colour-overlay branch its material takes. This
+    /// is what decides if the grass UV3 mapping is safe to generalise.</summary>
+    public static void DumpVegetationMeshes()
+    {
+        var seen = new System.Collections.Generic.HashSet<string>();
+        foreach (var mr in Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            var mf = mr.GetComponent<MeshFilter>();
+            var mesh = mf != null ? mf.sharedMesh : null;
+            if (mesh == null) continue;
+            foreach (var mat in mr.sharedMaterials)
+            {
+                if (mat == null || mat.shader == null) continue;
+                if (!mat.shader.name.Contains("Vegetation")) continue;
+                string key = mat.name + "|" + mesh.name;
+                if (!seen.Add(key)) continue;
+                bool uv3 = mesh.HasVertexAttribute(UnityEngine.Rendering.VertexAttribute.TexCoord3);
+                string kws = string.Join(",", mat.shaderKeywords);
+                Debug.Log($"[HZVM] mat='{mat.name}' mesh='{mesh.name}' hasUV3={uv3} overlayUV={mat.IsKeywordEnabled("_COLOR_OVERLAY_UV")} keywords=[{kws}]");
+            }
+        }
+        Debug.Log("[HZVM] done");
+    }
+
+    /// <summary>Texture-independent read of the colour-overlay blend T. Two captures with
+    /// the tint ramp reversed: A = tex*T*light, B = tex*(1-T)*light, so A/(A+B) == T with
+    /// the albedo cancelled. A red/blue probe only works where the albedo is neutral.</summary>
+    public static void CaptureBlendRatioProbe()
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZBR] no main camera"); return; }
+        var mats = new System.Collections.Generic.List<Material>();
+        foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { "Assets/Idyllic Fantasy Nature/Materials" }))
+        {
+            var m = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
+            if (m == null || m.shader == null || !m.shader.name.Contains("Vegetation")) continue;
+            if (!m.HasProperty("_Top_Color") || !m.HasProperty("_Bottom_Color")) continue;
+            mats.Add(m);
+        }
+        var sb = new Color[mats.Count]; var st = new Color[mats.Count];
+        for (int i = 0; i < mats.Count; i++) { sb[i] = mats[i].GetColor("_Bottom_Color"); st[i] = mats[i].GetColor("_Top_Color"); }
+
+        for (int i = 0; i < mats.Count; i++) { mats[i].SetColor("_Bottom_Color", Color.black); mats[i].SetColor("_Top_Color", Color.white); }
+        ShootPlain(cam, $"{ABDir}/unity_blend_A.png");
+        for (int i = 0; i < mats.Count; i++) { mats[i].SetColor("_Bottom_Color", Color.white); mats[i].SetColor("_Top_Color", Color.black); }
+        ShootPlain(cam, $"{ABDir}/unity_blend_B.png");
+
+        for (int i = 0; i < mats.Count; i++) { mats[i].SetColor("_Bottom_Color", sb[i]); mats[i].SetColor("_Top_Color", st[i]); }
+        Debug.Log($"[HZBR] probed {mats.Count} materials; colours restored");
+    }
+
+    static void ShootPlain(Camera cam, string path)
+    {
+        var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32,
+                                   RenderTextureReadWrite.sRGB) { antiAliasing = 1 };
+        var req = new UnityEngine.Rendering.RenderPipeline.StandardRequest { destination = rt };
+        if (!UnityEngine.Rendering.RenderPipeline.SupportsRenderRequest(cam, req))
+        { Debug.LogError("[HZGP] render request unsupported"); return; }
+        UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cam, req);
+        var prev = RenderTexture.active;
+        RenderTexture.active = rt;
+        var tex = new Texture2D(1920, 1080, TextureFormat.RGBA32, false);
+        tex.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0);
+        tex.Apply();
+        RenderTexture.active = prev;
+        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        rt.Release(); Object.DestroyImmediate(rt);
+        Debug.Log($"[HZGP] wrote {path}");
     }
 
     static void Shoot(Camera cam, string path,
