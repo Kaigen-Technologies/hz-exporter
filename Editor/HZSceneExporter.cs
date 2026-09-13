@@ -79,6 +79,18 @@ namespace HZExporter
             // Bloom (engine requires bloom_enabled; bloom_intensity 0 disables).
             public float bloomIntensity, bloomThreshold, bloomScatter, bloomClamp;
             public Color bloomTint;
+            // Split toning / channel mixer as offsets from identity, so the engine's zero is neutral.
+            public Vector3 splitShadows, splitHighlights;   // Unity colour as URP uses it (gamma) - 0.5
+            public float splitBalance;                      // Unity balance / 100
+            public Vector3 mixerRed, mixerGreen, mixerBlue; // Unity row / 100 - unit row
+            // Depth of field: engine DofMode 0 off, 1 physical (URP Bokeh), 2 range (URP Gaussian).
+            public uint dofMode;
+            public float dofFocusDistance, dofFocalLength, dofAperture; // metres, metres, f-number
+            public uint dofBladeCount;
+            public float dofBladeCurvature, dofBladeRotation, dofMaxCocPixels;
+            public float dofRangeStart, dofRangeEnd, dofRangeMaxRadius;
+            public uint dofQuality; // engine DofQuality: 0 default, 2 medium, 3 high
+            public uint dofDebugView; // engine debug view: 0 off, 1 CoC, 2 tile classes, 3 near opacity
 
             public static PostProcessingSettings Default() => new PostProcessingSettings
             {
@@ -219,6 +231,21 @@ namespace HZExporter
         }
 
         // ============= .hzt text format writers =============
+
+        static void AppendVec3(StringBuilder sb, string name, Vector3 v)
+
+        {
+
+            sb.AppendLine($"  {name}");
+
+            sb.AppendLine($"    x {F(v.x)}");
+
+            sb.AppendLine($"    y {F(v.y)}");
+
+            sb.AppendLine($"    z {F(v.z)}");
+
+        }
+
 
         static string F(float v) => v.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -573,6 +600,26 @@ namespace HZExporter
                 sb.AppendLine($"    g {F(pp.bloomTint.g)}");
                 sb.AppendLine($"    b {F(pp.bloomTint.b)}");
                 sb.AppendLine($"    a {F(pp.bloomTint.a)}");
+                // the .hzt reader matches fields forward only: emit in engine struct order
+                AppendVec3(sb, "split_shadows", pp.splitShadows);
+                AppendVec3(sb, "split_highlights", pp.splitHighlights);
+                sb.AppendLine($"  split_balance {F(pp.splitBalance)}");
+                AppendVec3(sb, "mixer_red", pp.mixerRed);
+                AppendVec3(sb, "mixer_green", pp.mixerGreen);
+                AppendVec3(sb, "mixer_blue", pp.mixerBlue);
+                sb.AppendLine($"  dof_mode {pp.dofMode}");
+                sb.AppendLine($"  dof_focus_distance {F(pp.dofFocusDistance)}");
+                sb.AppendLine($"  dof_focal_length {F(pp.dofFocalLength)}");
+                sb.AppendLine($"  dof_aperture {F(pp.dofAperture)}");
+                sb.AppendLine($"  dof_blade_count {pp.dofBladeCount}");
+                sb.AppendLine($"  dof_blade_curvature {F(pp.dofBladeCurvature)}");
+                sb.AppendLine($"  dof_blade_rotation {F(pp.dofBladeRotation)}");
+                sb.AppendLine($"  dof_max_coc_pixels {F(pp.dofMaxCocPixels)}");
+                sb.AppendLine($"  dof_range_start {F(pp.dofRangeStart)}");
+                sb.AppendLine($"  dof_range_end {F(pp.dofRangeEnd)}");
+                sb.AppendLine($"  dof_range_max_radius {F(pp.dofRangeMaxRadius)}");
+                sb.AppendLine($"  dof_quality {pp.dofQuality}");
+                sb.AppendLine($"  dof_debug_view {pp.dofDebugView}");
             }
 
             // Custom components (boid authoring data, etc.) — emitted verbatim.

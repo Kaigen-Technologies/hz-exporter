@@ -1122,6 +1122,67 @@ public static class HZExportCommands
         }
     }
 
+    /// <summary>Main camera with the full post stack, then with depth of field, split toning and the channel
+    /// mixer each switched off in turn, so every effect's contribution is measured in Unity itself.</summary>
+    public static void CapturePostEffects()
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZPE] no main camera"); return; }
+        var profile = FindActivePostProfile();
+        if (profile == null) { Debug.LogError("[HZPE] no active global post-processing Volume"); return; }
+        ShootPlain(cam, $"{ABDir}/unity_post_all.png");
+        CaptureWithout<DepthOfField>(cam, profile, "unity_post_no_dof.png");
+        CaptureWithout<SplitToning>(cam, profile, "unity_post_no_split.png");
+        CaptureWithout<ChannelMixer>(cam, profile, "unity_post_no_mixer.png");
+        Debug.Log("[HZPE] post effect captures done");
+    }
+
+    // export variants: each leaves the profile switched until the next call, so an export in between reads it; SetPostVariantAll restores
+    public static void SetPostVariantAll() { SetPostVariant(true, true, true); }
+    public static void SetPostVariantNoDof() { SetPostVariant(false, true, true); }
+    public static void SetPostVariantNoSplit() { SetPostVariant(true, false, true); }
+    public static void SetPostVariantNoMixer() { SetPostVariant(true, true, false); }
+    public static void SetPostVariantNone() { SetPostVariant(false, false, false); }
+
+    // DoF export variants for the scene_day check: focus distance override and engine debug view, persisted until SetDofVariantDefault
+    static float s_dofFocusOverride = -1f;
+    static uint s_dofDebugView = 0;
+    public static void SetDofVariantFocus1m() { s_dofFocusOverride = 1.0f; s_dofDebugView = 0; Debug.Log("[HZPV] dof focus=1"); }
+    public static void SetDofVariantFocus8m() { s_dofFocusOverride = 8.0f; s_dofDebugView = 0; Debug.Log("[HZPV] dof focus=8"); }
+    public static void SetDofVariantDebugCoc() { s_dofFocusOverride = -1f; s_dofDebugView = 1; Debug.Log("[HZPV] dof debug=1"); }
+    public static void SetDofVariantDebugTiles() { s_dofFocusOverride = -1f; s_dofDebugView = 2; Debug.Log("[HZPV] dof debug=2"); }
+    public static void SetDofVariantDefault() { s_dofFocusOverride = -1f; s_dofDebugView = 0; Debug.Log("[HZPV] dof default"); }
+
+    static void SetPostVariant(bool dof, bool split, bool mixer)
+    {
+        var profile = FindActivePostProfile();
+        if (profile == null) { Debug.LogError("[HZPV] no active global post-processing Volume"); return; }
+        if (profile.TryGet<DepthOfField>(out var d)) d.active = dof;
+        if (profile.TryGet<SplitToning>(out var s)) s.active = split;
+        if (profile.TryGet<ChannelMixer>(out var m)) m.active = mixer;
+        Debug.Log($"[HZPV] variant dof={dof} split={split} mixer={mixer}");
+    }
+
+    /// <summary>Main camera with depth of field, split toning and the channel mixer all off: the baseline for the pre-existing parity gap.</summary>
+    public static void CapturePostNone()
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZPE] no main camera"); return; }
+        SetPostVariantNone();
+        try { ShootPlain(cam, $"{ABDir}/unity_post_none.png"); }
+        finally { SetPostVariantAll(); }
+        Debug.Log("[HZPE] none capture done");
+    }
+
+    static void CaptureWithout<T>(Camera cam, VolumeProfile profile, string file) where T : VolumeComponent
+    {
+        if (!profile.TryGet<T>(out var c)) { Debug.LogError($"[HZPE] profile has no {typeof(T).Name}"); return; }
+        bool was = c.active;
+        c.active = false;
+        try { ShootPlain(cam, $"{ABDir}/{file}"); }
+        finally { c.active = was; }
+    }
+
     static void ShootPlain(Camera cam, string path)
     {
         var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32,
@@ -1403,9 +1464,9 @@ public static class HZExportCommands
     // highest-priority active global Volume; only parameters whose override is enabled are applied,
     // the rest stay at the engine identity. URP has no exposure/brightness/gamma overrides, so those
     // keep their defaults.
-    static HZSceneExporter.PostProcessingSettings ReadPostProcessing()
+    // the highest-priority active global Volume, the profile URP's stack resolves first
+    static VolumeProfile FindActivePostProfile()
     {
-        var pp = HZSceneExporter.PostProcessingSettings.Default();
         VolumeProfile profile = null;
         float bestPriority = float.NegativeInfinity;
         foreach (var v in Object.FindObjectsOfType<Volume>())
@@ -1413,6 +1474,13 @@ public static class HZExportCommands
             if (!v.isActiveAndEnabled || !v.isGlobal || v.sharedProfile == null) continue;
             if (v.priority >= bestPriority) { bestPriority = v.priority; profile = v.sharedProfile; }
         }
+        return profile;
+    }
+
+    static HZSceneExporter.PostProcessingSettings ReadPostProcessing()
+    {
+        var pp = HZSceneExporter.PostProcessingSettings.Default();
+        VolumeProfile profile = FindActivePostProfile();
         if (profile == null) { Debug.Log("[HZpp] no active global post-processing Volume; using defaults"); return pp; }
 
         if (profile.TryGet<Tonemapping>(out var tm) && tm.active && tm.mode.overrideState)
@@ -1426,7 +1494,8 @@ public static class HZExportCommands
             // post_exposure stays raw EV (engine does exp2). color_filter raw.
             if (ca.postExposure.overrideState) pp.postExposure = ca.postExposure.value;
             if (ca.contrast.overrideState)     pp.contrast = ca.contrast.value / 100f;
-            if (ca.colorFilter.overrideState)  pp.colorFilter = ca.colorFilter.value;
+            // URP ColorGradingLutPass feeds colorFilter.value.linear to the LUT builder
+            if (ca.colorFilter.overrideState)  pp.colorFilter = ca.colorFilter.value.linear;
             if (ca.hueShift.overrideState)     pp.hueShift = ca.hueShift.value / 360f;
             if (ca.saturation.overrideState)   pp.saturation = ca.saturation.value / 100f;
         }
@@ -1451,12 +1520,53 @@ public static class HZExportCommands
             if (bl.clamp.overrideState)     pp.bloomClamp = bl.clamp.value;
             if (bl.tint.overrideState)      pp.bloomTint = bl.tint.value;
         }
+        // URP's stack resolves a parameter that is not overridden to the component DEFAULT, not the value stored in the profile
+        if (profile.TryGet<SplitToning>(out var st) && st.active)
+        {
+            var d = ScriptableObject.CreateInstance<SplitToning>();
+            Color sh = Resolved(st.shadows, d.shadows), hi = Resolved(st.highlights, d.highlights);
+            pp.splitShadows = new Vector3(sh.r - 0.5f, sh.g - 0.5f, sh.b - 0.5f);
+            pp.splitHighlights = new Vector3(hi.r - 0.5f, hi.g - 0.5f, hi.b - 0.5f);
+            pp.splitBalance = Resolved(st.balance, d.balance) / 100f;
+            Object.DestroyImmediate(d);
+        }
+        if (profile.TryGet<ChannelMixer>(out var cm) && cm.active)
+        {
+            var d = ScriptableObject.CreateInstance<ChannelMixer>();
+            pp.mixerRed = new Vector3(Resolved(cm.redOutRedIn, d.redOutRedIn) / 100f - 1f, Resolved(cm.redOutGreenIn, d.redOutGreenIn) / 100f, Resolved(cm.redOutBlueIn, d.redOutBlueIn) / 100f);
+            pp.mixerGreen = new Vector3(Resolved(cm.greenOutRedIn, d.greenOutRedIn) / 100f, Resolved(cm.greenOutGreenIn, d.greenOutGreenIn) / 100f - 1f, Resolved(cm.greenOutBlueIn, d.greenOutBlueIn) / 100f);
+            pp.mixerBlue = new Vector3(Resolved(cm.blueOutRedIn, d.blueOutRedIn) / 100f, Resolved(cm.blueOutGreenIn, d.blueOutGreenIn) / 100f, Resolved(cm.blueOutBlueIn, d.blueOutBlueIn) / 100f - 1f);
+            Object.DestroyImmediate(d);
+        }
+        if (profile.TryGet<DepthOfField>(out var dof) && dof.active && dof.mode.overrideState)
+        {
+            var d = ScriptableObject.CreateInstance<DepthOfField>();
+            pp.dofMode = dof.mode.value == DepthOfFieldMode.Bokeh ? 1u : dof.mode.value == DepthOfFieldMode.Gaussian ? 2u : 0u;
+            pp.dofFocusDistance = Resolved(dof.focusDistance, d.focusDistance);
+            pp.dofFocalLength = Resolved(dof.focalLength, d.focalLength) / 1000f; // URP focalLength is millimetres
+            pp.dofAperture = Resolved(dof.aperture, d.aperture);
+            pp.dofBladeCount = (uint)Resolved(dof.bladeCount, d.bladeCount);
+            pp.dofBladeCurvature = Resolved(dof.bladeCurvature, d.bladeCurvature);
+            pp.dofBladeRotation = Resolved(dof.bladeRotation, d.bladeRotation);
+            pp.dofMaxCocPixels = 0f; // engine default (32 px at 1080p); URP Bokeh caps near 14 px
+            pp.dofRangeStart = Resolved(dof.gaussianStart, d.gaussianStart);
+            pp.dofRangeEnd = Resolved(dof.gaussianEnd, d.gaussianEnd);
+            pp.dofRangeMaxRadius = Resolved(dof.gaussianMaxRadius, d.gaussianMaxRadius);
+            pp.dofQuality = Resolved(dof.highQualitySampling, d.highQualitySampling) ? 3u : 2u;
+            if (s_dofFocusOverride > 0f) pp.dofFocusDistance = s_dofFocusOverride;
+            pp.dofDebugView = s_dofDebugView;
+            Object.DestroyImmediate(d);
+        }
         Debug.Log($"[HZpp] '{profile.name}': contrast={pp.contrast} saturation={pp.saturation} "
                 + $"postExp={pp.postExposure} wbTemp={pp.whiteBalanceTemperature} wbTint={pp.whiteBalanceTint} "
                 + $"vignette(int={pp.vignetteIntensity}) tonemap={pp.tonemapMode} "
-                + $"bloom(int={pp.bloomIntensity} thresh={pp.bloomThreshold} scatter={pp.bloomScatter})");
+                + $"bloom(int={pp.bloomIntensity} thresh={pp.bloomThreshold} scatter={pp.bloomScatter}) "
+                + $"split(sh={pp.splitShadows} hi={pp.splitHighlights} bal={pp.splitBalance}) mixer(r={pp.mixerRed} g={pp.mixerGreen} b={pp.mixerBlue}) "
+                + $"dof(mode={pp.dofMode} focus={pp.dofFocusDistance} f={pp.dofFocalLength} N={pp.dofAperture} blades={pp.dofBladeCount} q={pp.dofQuality})");
         return pp;
     }
+
+    static T Resolved<T>(VolumeParameter<T> p, VolumeParameter<T> defaults) => p.overrideState ? p.value : defaults.value;
 
     // URP TonemappingMode -> engine TonemapMode (NONE=0, ACES=4, NEUTRAL=6).
     static uint MapTonemap(TonemappingMode m)
