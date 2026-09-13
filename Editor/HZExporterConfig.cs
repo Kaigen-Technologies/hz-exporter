@@ -32,6 +32,25 @@ namespace HZExporter
         // ---- Persistence ----
         const string ConfigPath = "UserSettings/HzExporter.json";
 
+        // per-run target from tools/import_unity_scene.sh (line 1 output dir, line 2 shader root); the saved config stays untouched
+        const string OutputOverridePath = "UserSettings/HzExportOutput.txt";
+
+        static string[] ReadOutputOverride()
+        {
+            try
+            {
+                string path = Path.GetFullPath(OutputOverridePath);
+                if (!File.Exists(path)) return null;
+                string[] lines = File.ReadAllLines(path);
+                return lines.Length >= 2 && !string.IsNullOrWhiteSpace(lines[0]) ? lines : null;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[HZExporterConfig] failed to read {OutputOverridePath}: {e.Message}");
+                return null;
+            }
+        }
+
         static HZExporterConfig s_instance;
 
         public static HZExporterConfig Instance
@@ -76,6 +95,8 @@ namespace HZExporter
         /// <summary>Absolute path to the local staging output dir.</summary>
         public string ResolvedOutputDir()
         {
+            string[] over = ReadOutputOverride();
+            if (over != null) return Path.GetFullPath(over[0].Trim());
             string dir = string.IsNullOrEmpty(outputDir) ? "ExportedAssets" : outputDir;
             return Path.GetFullPath(dir);
         }
@@ -83,6 +104,8 @@ namespace HZExporter
         /// <summary>Absolute engine shader root, or null when not configured.</summary>
         public string ResolvedShaderRootDir()
         {
+            string[] over = ReadOutputOverride();
+            if (over != null) return string.IsNullOrWhiteSpace(over[1]) ? null : Path.GetFullPath(over[1].Trim());
             if (string.IsNullOrEmpty(shaderRootDir)) return null;
             return Path.GetFullPath(shaderRootDir);
         }

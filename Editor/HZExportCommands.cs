@@ -568,8 +568,8 @@ public static class HZExportCommands
                 Debug.LogError($"[HZ] scene not found: '{want}'");
                 return;
             }
-            if (SceneManager.GetActiveScene().path != path)
-                EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            // SubScene content lives in separate .unity files a plain OpenScene never loads
+            if (!OpenSceneWithSubScenes(path)) return;
         }
         ExportScene();
     }
@@ -1744,16 +1744,18 @@ public static class HZExportCommands
     /// Open a scene (Single) then additively open all SubScenes it references so the
     /// full graph is loaded. Returns once everything is open.
     /// </summary>
-    static void OpenSceneWithSubScenes(string mainScenePath)
+    static bool OpenSceneWithSubScenes(string mainScenePath)
     {
         if (EditorApplication.isPlaying)
         {
             // Scene ops are illegal in play mode; request exit and bail. Re-run after.
-            Debug.LogWarning("[HZ] In play mode — exiting play mode. Re-run ExportBoids once stopped.");
+            Debug.LogWarning("[HZ] In play mode — exiting play mode. Re-run the export once stopped.");
             EditorApplication.isPlaying = false;
-            return;
+            return false;
         }
-        EditorSceneManager.OpenScene(mainScenePath, OpenSceneMode.Single);
+        // an already-active scene keeps its unsaved edits; only its missing SubScenes are opened
+        if (SceneManager.GetActiveScene().path != mainScenePath)
+            EditorSceneManager.OpenScene(mainScenePath, OpenSceneMode.Single);
 
         // Resolve SubScene components → SceneAsset path, open additively if not already open.
         var subScenes = Object.FindObjectsByType<SubScene>(FindObjectsSortMode.None);
@@ -1767,6 +1769,7 @@ public static class HZExportCommands
             EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
             Debug.Log($"[HZ] Opened SubScene additively: {path}");
         }
+        return true;
     }
 
     /// <summary>
