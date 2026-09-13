@@ -1183,6 +1183,16 @@ public static class HZExportCommands
         finally { c.active = was; }
     }
 
+    /// <summary>Main camera of the open scene with its full post stack, to references/&lt;scene&gt;_unity.png.</summary>
+    public static void CaptureSceneReference()
+    {
+        var cam = Camera.main;
+        if (cam == null) { Debug.LogError("[HZSR] no main camera"); return; }
+        string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        ShootPlain(cam, $"{ABDir}/{scene}_unity.png");
+        Debug.Log($"[HZSR] captured {scene}");
+    }
+
     static void ShootPlain(Camera cam, string path)
     {
         var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32,
