@@ -234,7 +234,13 @@ namespace HZExporter.ShaderGraph
                 ? (IsBaseColorWired(g) ? LIT_LIGHTING : "    vec3 lit = vec3(0.0);\n")
                 : "";
 
+            // gbuffer/TAAU outputs mirror standard.hz.glsl; the normal is the lit surface normal when the graph shades,
+            // the interpolated one otherwise
+            string gbufNormal = (isLit && IsBaseColorWired(g)) ? "N" : "normalize(v_normal)";
+
             return template
+                .Replace("${GBUFFER_FS_OUTPUTS}", GBUFFER_FS_OUTPUTS)
+                .Replace("${GBUFFER_FS_WRITES}", GBUFFER_FS_WRITES.Replace("${GBUF_NORMAL}", gbufNormal))
                 .Replace("${LIGHTING}", lighting)
                 .Replace("${MATERIAL_STRUCT}", fsMaterial)
                 .Replace("${VS_MATERIAL}",    vsMaterial)
@@ -577,6 +583,39 @@ namespace HZExporter.ShaderGraph
 
         // ===== templates =======================================================
 
+        // Fragment outputs and writes the renderer's gbuffer (TAA, 3-MRT) and TAAU (6-MRT) modes attach, copied
+        // from standard.hz.glsl. Transparent materials reuse the opaque writes: their pipeline keeps the
+        // destination velocity/normal/depth/opaque and only accumulates reactive.
+        const string GBUFFER_FS_OUTPUTS =
+@"#ifdef HZ_RENDERER_GBUFFER
+in vec4 v_clip_cur;
+in vec4 v_clip_prev;
+layout(location = 1) out vec2 frag_velocity; // NDC delta (FSR2 convention)
+#ifdef HZ_RENDERER_TAAU
+layout(location = 2) out vec2 frag_normal;   // octahedral RG8 world normal (reactive is RT4)
+layout(location = 3) out float frag_depth;    // R32F gbuffer depth (gl_FragCoord.z)
+layout(location = 4) out float frag_reactive; // authored reactive mask for TAAU
+layout(location = 5) out vec4 frag_opaque;    // opaque-only color for TAAU tcr-autogen
+#else
+layout(location = 2) out vec4 frag_normal;   // world normal oct in .rg, .a = reactive
+#endif
+#endif
+";
+
+        const string GBUFFER_FS_WRITES =
+@"#ifdef HZ_RENDERER_GBUFFER
+    frag_velocity = v_clip_cur.xy / v_clip_cur.w - v_clip_prev.xy / v_clip_prev.w;
+#ifdef HZ_RENDERER_TAAU
+    frag_normal = oct_encode_normal(${GBUF_NORMAL});
+    frag_depth = gl_FragCoord.z;
+    frag_reactive = 0.0;
+    frag_opaque = vec4(frag_color.rgb, 1.0);
+#else
+    frag_normal = vec4(oct_encode_normal(${GBUF_NORMAL}), 0.0, 0.0);
+#endif
+#endif
+";
+
         // The body block is what changes per shader; everything around it (vs
         // outputs, fs inputs, lighting calls, MaterialFS) is fixed for a given
         // variant. As we add features (alpha clip, transparency, skinned, …)
@@ -589,6 +628,10 @@ out vec2 v_uv1;
 out vec4 v_color;
 flat out uint v_material_offset;
 out vec3 v_normal;
+#ifdef HZ_RENDERER_GBUFFER
+out vec4 v_clip_cur;
+out vec4 v_clip_prev;
+#endif
 ${VS_MATERIAL}
 ${VS_HELPERS}
 void main() {
@@ -600,6 +643,11 @@ ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0
     v_color = v.color;
     v_material_offset = v.material_offset;
     v_normal = normalize((v.model * vec4(${VS_NORMAL}, 0.0)).xyz);
+#ifdef HZ_RENDERER_GBUFFER
+    // jitter-free motion vectors through the previous model; time-driven vertex motion stays camera-only
+    v_clip_cur = hz_scene.view_proj_unjittered * world_pos;
+    v_clip_prev = hz_scene.prev_view_proj * (unpack_prev_model() * vec4(${VS_POS}, 1.0));
+#endif
 }
 @end
 
@@ -610,14 +658,14 @@ in vec2 v_uv1;
 in vec4 v_color;
 flat in uint v_material_offset;
 in vec3 v_normal;
-out vec4 frag_color;
-
+layout(location = 0) out vec4 frag_color;
+${GBUFFER_FS_OUTPUTS}
 ${MATERIAL_STRUCT}
 ${HELPERS}${FUNCTIONS}void main() {
     MaterialFS mat = MaterialFS_unpack(v_material_offset);
 ${MAIN_BODY}
     frag_color = vec4(base_color, 1.0);
-}
+${GBUFFER_FS_WRITES}}
 @end
 ";
 
@@ -634,6 +682,10 @@ flat out uint v_material_offset;
 out vec3 v_tangent;
 out float v_bitangent_sign;
 out float v_view_depth;
+#ifdef HZ_RENDERER_GBUFFER
+out vec4 v_clip_cur;
+out vec4 v_clip_prev;
+#endif
 ${VS_MATERIAL}
 ${VS_HELPERS}
 void main() {
@@ -650,6 +702,11 @@ ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0
     v_color = v.color;
     v_material_offset = v.material_offset;
     v_view_depth = -(hz_scene.view * world_pos).z;
+#ifdef HZ_RENDERER_GBUFFER
+    // jitter-free motion vectors through the previous model; time-driven vertex motion stays camera-only
+    v_clip_cur = hz_scene.view_proj_unjittered * world_pos;
+    v_clip_prev = hz_scene.prev_view_proj * (unpack_prev_model() * vec4(${VS_POS}, 1.0));
+#endif
 }
 @end
 
@@ -668,8 +725,8 @@ flat in uint v_material_offset;
 in vec3 v_tangent;
 in float v_bitangent_sign;
 in float v_view_depth;
-out vec4 frag_color;
-
+layout(location = 0) out vec4 frag_color;
+${GBUFFER_FS_OUTPUTS}
 ${MATERIAL_STRUCT}
 ${HELPERS}${FUNCTIONS}void main() {
     MaterialFS mat = MaterialFS_unpack(v_material_offset);
@@ -678,7 +735,7 @@ ${LIGHTING}
     lit += emission;
     lit = hz_apply_fog(lit, v_view_depth);
     frag_color = vec4(lit, 1.0);
-}
+${GBUFFER_FS_WRITES}}
 @end
 ";
 
@@ -713,6 +770,10 @@ flat out uint v_material_offset;
 out vec3 v_tangent;
 out float v_bitangent_sign;
 out float v_view_depth;
+#ifdef HZ_RENDERER_GBUFFER
+out vec4 v_clip_cur;
+out vec4 v_clip_prev;
+#endif
 void main() {
     MaterialFS mat = MaterialFS_unpack(hz_draw_params.material_offset);
     GrassVertex gv = grass_pull_vertex(mat);
@@ -729,6 +790,11 @@ void main() {
     v_color = vec4(1.0);
     v_material_offset = hz_draw_params.material_offset;
     v_view_depth = -(hz_scene.view * world_pos).z;
+#ifdef HZ_RENDERER_GBUFFER
+    // grass has no previous transform: motion is camera-only, as in the engine's grass_terrain shader
+    v_clip_cur = hz_scene.view_proj_unjittered * world_pos;
+    v_clip_prev = hz_scene.prev_view_proj * world_pos;
+#endif
 }
 @end
 
@@ -747,8 +813,8 @@ flat in uint v_material_offset;
 in vec3 v_tangent;
 in float v_bitangent_sign;
 in float v_view_depth;
-out vec4 frag_color;
-
+layout(location = 0) out vec4 frag_color;
+${GBUFFER_FS_OUTPUTS}
 ${MATERIAL_STRUCT}
 ${HELPERS}${FUNCTIONS}void main() {
     MaterialFS mat = MaterialFS_unpack(v_material_offset);
@@ -757,7 +823,7 @@ ${LIGHTING}
     lit += emission;
     lit = hz_apply_fog(lit, v_view_depth);
     frag_color = vec4(lit, 1.0);
-}
+${GBUFFER_FS_WRITES}}
 @end
 ";
 
