@@ -1186,31 +1186,94 @@ public static class HZExportCommands
     /// <summary>Main camera of the open scene with its full post stack, to references/&lt;scene&gt;_unity.png.</summary>
     public static void CaptureSceneReference()
     {
-        var cam = Camera.main;
-        if (cam == null) { Debug.LogError("[HZSR] no main camera"); return; }
-        string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-        ShootPlain(cam, $"{ABDir}/{scene}_unity.png");
-        Debug.Log($"[HZSR] captured {scene}");
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        var cam = ResolveSceneCamera(scene.GetRootGameObjects());
+        if (cam == null) { Debug.LogError("[HZSR] no camera in scene"); return; }
+        ShootPlain(cam, $"{ABDir}/{scene.name}_unity.png");
+        Debug.Log($"[HZSR] captured {scene.name} with '{cam.name}'");
     }
 
-    static void ShootPlain(Camera cam, string path)
+    /// <summary>Unity switches LOD when lodBias * (size * scale / 2) / (dist * tan(fov/2)) drops below the
+    /// transition height; the engine compares bounds half-diagonal / (dist * tan(fov/2)). Rescale so both switch at the same distance.</summary>
+    internal static float EngineLodSwitchCoverage(LODGroup group, float transitionHeight, Bounds baseWorldBounds)
     {
-        var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32,
+        Vector3 s = group.transform.lossyScale;
+        float groupRadius = 0.5f * group.size * Mathf.Max(Mathf.Abs(s.x), Mathf.Max(Mathf.Abs(s.y), Mathf.Abs(s.z)));
+        float engineRadius = baseWorldBounds.extents.magnitude;
+        if (groupRadius <= 0f || engineRadius <= 0f || QualitySettings.lodBias <= 0f) return transitionHeight;
+        return transitionHeight * engineRadius / (groupRadius * QualitySettings.lodBias);
+    }
+
+    /// <summary>The scene's view camera, shared by export and reference capture so both frame the
+    /// same shot: Camera.main, else the first active camera, else the first camera at all.</summary>
+    internal static Camera ResolveSceneCamera(GameObject[] roots)
+    {
+        if (Camera.main != null) return Camera.main;
+        Camera firstAny = null;
+        foreach (var root in roots)
+        {
+            foreach (var c in root.GetComponentsInChildren<Camera>(true))
+            {
+                if (c.isActiveAndEnabled) return c;
+                if (firstAny == null) firstAny = c;
+            }
+        }
+        return firstAny;
+    }
+
+    // Capture request written by tools/capture_unity_scene.sh: scene, output path, width, height (one per line).
+    const string CaptureRequestPath = "UserSettings/HzCaptureRequest.txt";
+
+    /// <summary>CLI entry point: open the requested scene (blank = the open one), render its view camera
+    /// at the requested size and write a PNG. Logs "[HZCAP] wrote" or "[HZCAP] failed" as the completion marker.</summary>
+    public static void CaptureTargetScene()
+    {
+        try
+        {
+            if (!System.IO.File.Exists(CaptureRequestPath)) { Debug.LogError("[HZCAP] failed: no capture request file"); return; }
+            var lines = System.IO.File.ReadAllLines(CaptureRequestPath);
+            string want = lines.Length > 0 ? lines[0].Trim() : "";
+            string outPath = lines.Length > 1 ? lines[1].Trim() : "";
+            int w = lines.Length > 2 && int.TryParse(lines[2].Trim(), out var pw) ? pw : 1920;
+            int h = lines.Length > 3 && int.TryParse(lines[3].Trim(), out var ph) ? ph : 1080;
+            if (string.IsNullOrEmpty(outPath)) { Debug.LogError("[HZCAP] failed: no output path"); return; }
+
+            if (!string.IsNullOrEmpty(want))
+            {
+                string path = ResolveScenePath(want);
+                if (path == null) { Debug.LogError($"[HZCAP] failed: scene not found '{want}'"); return; }
+                if (!OpenSceneWithSubScenes(path)) { Debug.LogError("[HZCAP] failed: could not open scene (play mode?)"); return; }
+            }
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            var cam = ResolveSceneCamera(scene.GetRootGameObjects());
+            if (cam == null) { Debug.LogError($"[HZCAP] failed: no camera in '{scene.name}'"); return; }
+            if (!ShootPlain(cam, outPath, w, h)) { Debug.LogError("[HZCAP] failed: render request unsupported"); return; }
+            Debug.Log($"[HZCAP] wrote {outPath} scene='{scene.name}' camera='{cam.name}' size={w}x{h}");
+        }
+        catch (System.Exception e) { Debug.LogError($"[HZCAP] failed: {e.Message}\n{e.StackTrace}"); }
+    }
+
+    static void ShootPlain(Camera cam, string path) => ShootPlain(cam, path, 1920, 1080);
+
+    static bool ShootPlain(Camera cam, string path, int w, int h)
+    {
+        var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32,
                                    RenderTextureReadWrite.sRGB) { antiAliasing = 1 };
         var req = new UnityEngine.Rendering.RenderPipeline.StandardRequest { destination = rt };
         if (!UnityEngine.Rendering.RenderPipeline.SupportsRenderRequest(cam, req))
-        { Debug.LogError("[HZGP] render request unsupported"); return; }
+        { Debug.LogError("[HZGP] render request unsupported"); rt.Release(); Object.DestroyImmediate(rt); return false; }
         UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cam, req);
         var prev = RenderTexture.active;
         RenderTexture.active = rt;
-        var tex = new Texture2D(1920, 1080, TextureFormat.RGBA32, false);
-        tex.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0);
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
         tex.Apply();
         RenderTexture.active = prev;
         System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
         Object.DestroyImmediate(tex);
         rt.Release(); Object.DestroyImmediate(rt);
         Debug.Log($"[HZGP] wrote {path}");
+        return true;
     }
 
     static void Shoot(Camera cam, string path,
@@ -1678,7 +1741,7 @@ public static class HZExportCommands
 
     static void AppendBoidComponents(GameObject go,
         ref HZSceneExporter.EntityExportInfo info,
-        Dictionary<string, string> exportedGlbs)
+        GlbExportCache exportedGlbs)
     {
         // --- BoidSchoolAuthoring → BoidSchool (spawner: count, radius, flocking weights, model) ---
         var school = go.GetComponent("BoidSchoolAuthoring") as MonoBehaviour;
@@ -1890,7 +1953,7 @@ public static class HZExportCommands
                     if (lodRdr == null) continue;
 
                     // Threshold to switch INTO this LOD = the previous LOD's transition height.
-                    float switchCoverage = lods[li - 1].screenRelativeTransitionHeight;
+                    float switchCoverage = EngineLodSwitchCoverage(lodGroup, lods[li - 1].screenRelativeTransitionHeight, baseRdr.bounds);
                     extras.Add((lodRdr, switchCoverage));
 
                     // Skip every non-base LOD renderer that isn't also a base.
@@ -1912,8 +1975,7 @@ public static class HZExportCommands
 
         // GLB dedup: key by (mesh, materials[]) — same mesh with different material assignments
         // must produce distinct GLBs since materials (including textures) are embedded.
-        var exportedGlbs = new Dictionary<string, string>();
-        var usedGlbNames = new HashSet<string>();
+        var exportedGlbs = new GlbExportCache();
 
         // Terrain dedup: shared TerrainData asset → exported once.
         // key = TerrainData asset path (or instance id when not a project asset) → asset-ref path.
@@ -2257,14 +2319,24 @@ public static class HZExportCommands
 
                     Debug.Log($"[HZ] Entity: {go.name} (camera)");
                 }
-                // Lights
-                else if (go.TryGetComponent<Light>(out var light))
+                // Lights. Engine light sync ignores EcsVisibility, so a light Unity isn't rendering must not be emitted.
+                else if (go.TryGetComponent<Light>(out var light) && !(light.enabled && go.activeInHierarchy))
+                {
+                    Debug.Log($"[HZ] Entity: {go.name} ({light.type} light inactive in Unity; light not exported)");
+                }
+                else if (light != null)
                 {
                     // light.color IS the picker (sRGB) value and Unity's shaders use
                     // light.color.linear, so pass it RAW: the engine's srgb_to_linear
                     // then reproduces exactly what URP uses. LinearToSrgb here would
                     // double-encode (measured: sun 1.00/1.06/1.25x too bright in R/G/B).
                     Color c = light.color;
+                    // URP lights with color.linear * CCT; re-encode so the engine's srgb_to_linear yields that product
+                    if (light.useColorTemperature && GraphicsSettings.lightsUseColorTemperature)
+                    {
+                        Color lin = c.linear * Mathf.CorrelatedColorTemperatureToRGB(light.colorTemperature);
+                        c = new Color(lin.r, lin.g, lin.b, c.a).gamma;
+                    }
                     if (light.type == LightType.Directional)
                     {
                         Vector3 fwd = t.forward;
@@ -2341,15 +2413,7 @@ public static class HZExportCommands
         // skybox material exists. A scene can have a skybox assigned but a camera
         // that clears to a SolidColor — in that case the skybox is never visible,
         // so we don't export it; the engine clears to the camera's background color.
-        Camera mainCam = Camera.main;
-        if (mainCam == null)
-        {
-            foreach (var root in roots)
-            {
-                var c = root.GetComponentInChildren<Camera>(true);
-                if (c != null) { mainCam = c; break; }
-            }
-        }
+        Camera mainCam = ResolveSceneCamera(roots);
         bool cameraUsesSkybox = mainCam != null && mainCam.clearFlags == CameraClearFlags.Skybox;
         // Camera background: pass the raw (linear) color through unchanged — the engine
         // clears the swapchain with it directly (GPU sRGB-encodes on write), unlike
@@ -2525,14 +2589,11 @@ public static class HZExportCommands
     // asset-relative path used by EcsModelRef.model. Shared by the entity static-mesh
     // path and the LOD entries on a LODGroup base.
     //
-    // Dedup is by mesh only (not by material combo). Multiple entities sharing the
-    // same mesh with different material overrides reuse one GLB; the engine extracts
-    // material/textures from the GLB once and entity-level material overrides come
-    // from external EcsMaterialRef. Splitting GLBs by material would cause the engine
-    // GLB cooker to write the same texture filename from multiple sources → asset
-    // collision.
+    // Dedup is by (mesh, material set): materials are embedded in the GLB, so renderers that share a
+    // mesh but assign different materials need distinct GLBs. A material shared by several GLBs cooks
+    // to byte-identical outputs, which the engine GLB cooker does not treat as a collision.
     static string ExportStaticGlbForRenderer(MeshRenderer mr, Mesh mesh,
-        Dictionary<string, string> exportedGlbs, bool grassShader = false)
+        GlbExportCache exportedGlbs, bool grassShader = false)
     {
         // WORKAROUND: the builtin Plane is reused across scenes and exports to the same
         // `Plane.glb`. The cooker dedupes textures/materials by GLB name, so each scene's Plane
@@ -2547,16 +2608,45 @@ public static class HZExportCommands
         // Grass meshes emit a `_grass` shader variant, so they must be a distinct GLB from any
         // normal static export of the same mesh — namespace both the dedup key and the filename.
         string meshKey = GetMeshKey(mesh) + planeSuffix + (grassShader ? "::grass" : "");
-        if (exportedGlbs.TryGetValue(meshKey, out string cached))
+        string materialSet = MaterialSetSignature(mr.sharedMaterials);
+        string cacheKey = meshKey + "|" + materialSet;
+        if (exportedGlbs.TryGetValue(cacheKey, out string cached))
             return cached;
 
+        // the first material set exported for a mesh keeps the plain name; other sets get a stable suffix
         string glbName = GetMeshSourceName(mesh) + planeSuffix + (grassShader ? "_grass" : "");
+        if (!exportedGlbs.FirstMaterialSetByMesh.TryGetValue(meshKey, out string firstSet))
+            exportedGlbs.FirstMaterialSetByMesh[meshKey] = materialSet;
+        else if (firstSet != materialSet)
+            glbName += "__" + Hash128.Compute(materialSet).ToString().Substring(0, 8);
         string glbPath = $"{OutputDir}/glb/{glbName}.glb";
         string glbAssetPath = $"{AssetPrefix}/glb/{glbName}.glb";
 
         HZGlbWriter.ExportStaticMesh(mesh, mr.sharedMaterials, glbPath, grassShader);
-        exportedGlbs[meshKey] = glbAssetPath;
+        exportedGlbs[cacheKey] = glbAssetPath;
         return glbAssetPath;
+    }
+
+    /// <summary>GLB dedup cache for one export: (mesh, material set) -> GLB asset path, plus the first
+    /// material set exported per mesh so later sets get a distinct file name.</summary>
+    class GlbExportCache : Dictionary<string, string>
+    {
+        public readonly Dictionary<string, string> FirstMaterialSetByMesh = new Dictionary<string, string>();
+    }
+
+    // Stable across editor sessions: material asset GUID + local id, or the name for non-asset materials.
+    static string MaterialSetSignature(Material[] mats)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var m in mats)
+        {
+            if (m == null) { sb.Append("null;"); continue; }
+            if (AssetDatabase.TryGetGUIDAndLocalFileIdentifier(m, out string guid, out long localId))
+                sb.Append(guid).Append(':').Append(localId).Append(';');
+            else
+                sb.Append(m.name).Append(';');
+        }
+        return sb.ToString();
     }
 
     // Resolved tree-prototype model: LOD0 GLB ref + extra LOD refs + render flags.
@@ -2571,7 +2661,7 @@ public static class HZExportCommands
     // Export one tree prototype prefab as a model (LOD0 + extra LODs), reusing the static-mesh
     // GLB path. Mirrors the scene LODGroup handling: LOD0's first static MeshRenderer is the base,
     // LOD1+ become extra_lods with switch_coverage = the previous LOD's transition height.
-    static TreeProtoModel ExportTreePrototype(GameObject prefab, Dictionary<string, string> exportedGlbs)
+    static TreeProtoModel ExportTreePrototype(GameObject prefab, GlbExportCache exportedGlbs)
     {
         var pm = new TreeProtoModel();
         var lg = prefab.GetComponentInChildren<LODGroup>(true);
@@ -2600,7 +2690,7 @@ public static class HZExportCommands
                     if (r is MeshRenderer m && m.TryGetComponent(out MeshFilter mf) && mf.sharedMesh != null)
                     { lr = m; lf = mf; break; }
                 if (lr == null) continue;
-                float switchCov = lods[li - 1].screenRelativeTransitionHeight;
+                float switchCov = EngineLodSwitchCoverage(lg, lods[li - 1].screenRelativeTransitionHeight, baseMr.bounds);
                 pm.extraLods.Add((ExportStaticGlbForRenderer(lr, lf.sharedMesh, exportedGlbs), switchCov));
             }
         }
@@ -2625,7 +2715,7 @@ public static class HZExportCommands
     // (width, height, width). The scene exporter's negate-X / rotation-mirror lands them on the
     // X-mirrored terrain (verified against the X-flipped heightmap). Prototype models are deduped.
     static void CollectTreeEntities(GameObject[] roots, UnityEngine.SceneManagement.Scene scene,
-        List<HZSceneExporter.EntityExportInfo> entities, Dictionary<string, string> exportedGlbs)
+        List<HZSceneExporter.EntityExportInfo> entities, GlbExportCache exportedGlbs)
     {
         var protoCache = new Dictionary<EntityId, TreeProtoModel>();
         foreach (var root in roots)

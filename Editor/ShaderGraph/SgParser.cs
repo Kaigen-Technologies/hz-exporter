@@ -183,7 +183,10 @@ namespace HZExporter.ShaderGraph
         static string MakeFieldName(string refName, string fallback)
         {
             string s = !string.IsNullOrEmpty(refName) ? refName : fallback;
-            return string.IsNullOrEmpty(s) ? "_unnamed" : SgNames.ToSnakeCase(s);
+            if (string.IsNullOrEmpty(s)) return "_unnamed";
+            string field = SgNames.ToSnakeCase(s);
+            // GLSL identifiers cannot start with a digit (e.g. reference "_0_0_1")
+            return field.Length > 0 && char.IsDigit(field[0]) ? "p_" + field : field;
         }
 
         // ----- helpers -------------------------------------------------------
@@ -210,6 +213,7 @@ namespace HZExporter.ShaderGraph
 
                     // Pull AlphaClip / SurfaceType / etc. while we're here.
                     if (target.TryGetValue("m_AlphaClip", out var ac) && ac is bool acb) g.AlphaClip = acb;
+                    if (target.TryGetValue("m_AllowMaterialOverride", out var amo) && amo is bool amob) g.AllowMaterialOverride = amob;
 
                     if (target.TryGetValue("m_ActiveSubTarget", out var subRef)
                         && subRef is Dictionary<string, object> subDict
@@ -242,6 +246,7 @@ namespace HZExporter.ShaderGraph
                 if (kv.Value.TryGetValue("m_ShaderOutputName", out var on)) s.OutputName = on as string;
                 if (kv.Value.TryGetValue("m_DisplayName", out var dn)) s.DisplayName = dn as string;
                 if (kv.Value.TryGetValue("m_SlotType", out var st) && st is double stD) s.IsOutput = (int)stD == 1;
+                if (kv.Value.TryGetValue("m_Space", out var sp) && sp is double spD) s.Space = (int)spD;
 
                 // m_Value is the user-typed inspector literal; m_DefaultValue is
                 // the slot's compile-time fallback (usually identity/zero). We

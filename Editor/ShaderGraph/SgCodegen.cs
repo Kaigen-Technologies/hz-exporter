@@ -55,7 +55,7 @@ namespace HZExporter.ShaderGraph
             // Opaque materials use the engine's global standard_shadow pipeline
             // and don't need a per-material file.
             string shadow = null;
-            if (g.AlphaClip)
+            if (HasAlphaClipPath(g))
             {
                 var sh = new StringBuilder();
                 sh.AppendLine($"// Generated from {sourceName}.shadergraph by HZShaderGraphExporter (shadow caster)");
@@ -150,7 +150,7 @@ namespace HZExporter.ShaderGraph
             // Alpha clip: lower Alpha + AlphaClipThreshold into local
             // assigns; the discard line is appended verbatim after the
             // optimizer runs.
-            if (g.AlphaClip)
+            if (HasAlphaClipPath(g))
             {
                 assigns.Add(LowerSurface(g, ctx, "Alpha",               "alpha",                SgType.Float, Sg.Lit(1.0)));
                 assigns.Add(LowerSurface(g, ctx, "AlphaClipThreshold",  "alpha_clip_threshold", SgType.Float, Sg.Lit(0.5)));
@@ -194,8 +194,8 @@ namespace HZExporter.ShaderGraph
             EmitStickyNotes(body, g);
             EmitStatementsWithGroupHeaders(body, ctx.Statements, g);
             foreach (var a in assigns)        body.Append("    ").Append(a.Format()).Append('\n');
-            if (g.AlphaClip)
-                body.Append("    if (alpha < alpha_clip_threshold) discard;\n");
+            if (HasAlphaClipPath(g))
+                body.Append(DiscardLine(g));
             string bodyStr = body.ToString().TrimEnd('\n');
 
             // Only emit the vertex-stage material mirror when something in
@@ -229,7 +229,7 @@ namespace HZExporter.ShaderGraph
 
             // Lit graphs that leave Base Color unwired are "implicit unlit" (their
             // output is driven through Emission). Skip the PBR lighting block and
-            // start from black — the tail (occlusion/emission/fog) carries it.
+            // start from black — the tail (emission/fog) carries it.
             string lighting = isLit
                 ? (IsBaseColorWired(g) ? LIT_LIGHTING : "    vec3 lit = vec3(0.0);\n")
                 : "";
@@ -255,6 +255,14 @@ namespace HZExporter.ShaderGraph
         // ${VERTEX_BODY} so wind/bend stays in sync), and a fragment stage
         // that runs only the alpha-clip slice + discard. Only called when
         // g.AlphaClip is true.
+        // alpha lowering and the shadow caster follow the graph's own Alpha Clipping; material override only gates the discard
+        static bool HasAlphaClipPath(SgGraph g) => g.AlphaClip;
+
+        // URP AddAlphaClipControlToPass: with material override, _ALPHATEST_ON is a per-material keyword
+        static string DiscardLine(SgGraph g) => g.AllowMaterialOverride
+            ? "#ifdef _ALPHATEST_ON\n    if (alpha < alpha_clip_threshold) discard;\n#endif\n"
+            : "    if (alpha < alpha_clip_threshold) discard;\n";
+
         static string EmitShadowFromTemplate(SgGraph g)
         {
             // Reuse the same vertex lowering as the forward shader so the
@@ -306,7 +314,7 @@ namespace HZExporter.ShaderGraph
             var body = new StringBuilder();
             EmitStatementsWithGroupHeaders(body, ctx.Statements, g);
             foreach (var a in assigns) body.Append("    ").Append(a.Format()).Append('\n');
-            body.Append("    if (alpha < alpha_clip_threshold) discard;\n");
+            body.Append(DiscardLine(g));
 
             string vsBodyStr = vsBody.ToString();
             bool vsNeedsMaterial = vsBodyStr.Contains("mat.");
@@ -667,7 +675,6 @@ ${HELPERS}${FUNCTIONS}void main() {
     MaterialFS mat = MaterialFS_unpack(v_material_offset);
 ${MAIN_BODY}
 ${LIGHTING}
-    lit *= occlusion;
     lit += emission;
     lit = hz_apply_fog(lit, v_view_depth);
     frag_color = vec4(lit, 1.0);
@@ -747,7 +754,6 @@ ${HELPERS}${FUNCTIONS}void main() {
     MaterialFS mat = MaterialFS_unpack(v_material_offset);
 ${MAIN_BODY}
 ${LIGHTING}
-    lit *= occlusion;
     lit += emission;
     lit = hz_apply_fog(lit, v_view_depth);
     frag_color = vec4(lit, 1.0);
@@ -759,11 +765,13 @@ ${LIGHTING}
         // ${LIGHTING} when the graph wires its Base Color. When Base Color is
         // unwired the graph is "implicit unlit" (output via Emission), so we
         // substitute `vec3 lit = vec3(0.0);` instead and let the tail
-        // (occlusion/emission/fog) carry the result.
+        // (emission/fog) carry the result.
         const string LIT_LIGHTING =
-@"    vec3 N = apply_normal_map(v_normal, v_tangent, v_bitangent_sign, normal_ts);
+@"    // the graph computed normal_ts in Unity's tangent space; flip Y into the engine frame (matches the cooked normal maps)
+    vec3 N = apply_normal_map(v_normal, v_tangent, v_bitangent_sign, normal_ts * vec3(1.0, -1.0, 1.0));
 
-    SurfaceInput surface = SurfaceInput(base_color, metallic, smoothness);
+    // URP PBRForwardPass saturates Metallic/Smoothness and applies Occlusion to indirect light only
+    SurfaceInput surface = SurfaceInput(base_color, saturate(metallic), saturate(smoothness));
     LightingInput li = LightingInput(v_world_pos, N, hz_scene.camera_pos);
     float shadow_factor = calculate_shadow(v_world_pos);
     vec3 lit = pbr_directional_lighting(surface, li, hz_scene.lights,
@@ -773,7 +781,7 @@ ${LIGHTING}
         lit += pbr_point_light(surface, li, light);
     HZ_CLUSTER_LOOP_END
 
-    lit += ibl_ambient(surface, li);
+    lit += ibl_ambient(surface, li) * occlusion;
 ";
 
         // Sibling shadow caster shader, emitted next to the forward LIT/UNLIT

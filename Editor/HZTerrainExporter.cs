@@ -130,8 +130,9 @@ namespace HZExporter
                 WriteSplatmap(td, amRes, s, first, last, layerCount, outDir, assetPrefix);
             }
 
+            var layerSizes = ComputeLayerGroupSizes(td.terrainLayers, layerCount);
             for (int i = 0; i < layerCount; i++)
-                WriteLayer(td.terrainLayers[i], i, td.name, outDir, assetPrefix);
+                WriteLayer(td.terrainLayers[i], i, td.name, layerSizes, outDir, assetPrefix);
 
             // Grass: map Unity detail prototypes → engine grass types. Models/albedo flow
             // through the injected scene callbacks; density maps are written terrain-local.
@@ -257,7 +258,39 @@ namespace HZExporter
 
         // ---- per-layer textures ----
 
-        static void WriteLayer(TerrainLayer layer, int idx, string terrainName, string outDir, string assetPrefix)
+        /// <summary>Per-group output size. The engine packs each layer group into one
+        /// texture_2d_array, so every albedo (and every normal, every mask) must share dimensions.</summary>
+        struct LayerGroupSizes
+        {
+            public Vector2Int albedo, normal, mask;
+        }
+
+        // Largest source size per group, so no layer loses detail; masks stay 1x1 when no layer has one.
+        static LayerGroupSizes ComputeLayerGroupSizes(TerrainLayer[] layers, int layerCount)
+        {
+            var s = new LayerGroupSizes { albedo = Vector2Int.zero, normal = Vector2Int.zero, mask = Vector2Int.one };
+            for (int i = 0; i < layerCount; i++)
+            {
+                var l = layers[i];
+                if (l == null) continue;
+                s.albedo = MaxSize(s.albedo, l.diffuseTexture);
+                s.normal = MaxSize(s.normal, l.normalMapTexture);
+                s.mask   = MaxSize(s.mask,   l.maskMapTexture);
+                // a synthesized mask carries smoothness * diffuse alpha per texel
+                if (l.maskMapTexture == null && SmoothnessUsesDiffuseAlpha(l))
+                    s.mask = MaxSize(s.mask, l.diffuseTexture);
+            }
+            return s;
+        }
+
+        static Vector2Int MaxSize(Vector2Int cur, Texture2D tex)
+        {
+            if (tex == null) return cur;
+            return new Vector2Int(Mathf.Max(cur.x, tex.width), Mathf.Max(cur.y, tex.height));
+        }
+
+        static void WriteLayer(TerrainLayer layer, int idx, string terrainName, LayerGroupSizes sizes,
+            string outDir, string assetPrefix)
         {
             if (layer == null)
             {
@@ -267,8 +300,8 @@ namespace HZExporter
             if (layer.tileSize.x != layer.tileSize.y)
                 Debug.LogWarning($"[HZTerrain]   layer{idx} '{layer.name}': non-uniform tileSize ({layer.tileSize}); engine uses scalar, taking .x");
 
-            WriteLayerTex(layer.diffuseTexture,   idx, "albedo", "TEX_FORMAT_BC1", isSrgb: true,  isNormal: false, outDir, assetPrefix);
-            WriteLayerTex(layer.normalMapTexture, idx, "normal", "TEX_FORMAT_BC5", isSrgb: false, isNormal: true,  outDir, assetPrefix);
+            WriteLayerTex(layer.diffuseTexture,   idx, "albedo", "TEX_FORMAT_BC1", isSrgb: true,  isNormal: false, sizes.albedo, outDir, assetPrefix);
+            WriteLayerTex(layer.normalMapTexture, idx, "normal", "TEX_FORMAT_BC5", isSrgb: false, isNormal: true,  sizes.normal, outDir, assetPrefix, layer.normalScale);
             if (layer.maskMapTexture != null)
             {
                 var mm = layer.maskMapTexture;
@@ -276,66 +309,177 @@ namespace HZExporter
                 // Log it (with the terrain name) so the right terrain can be confirmed.
                 if (mm.width <= 1 && mm.height <= 1)
                     Debug.Log($"[HZTerrain] '{terrainName}' layer{idx} '{layer.name}': mask map is a flat {mm.width}x{mm.height} texture ('{mm.name}') — basically no mask");
-                WriteLayerTex(mm, idx, "mask", "TEX_FORMAT_BC3", isSrgb: false, isNormal: false, outDir, assetPrefix);
+                WriteLayerTex(mm, idx, "mask", "TEX_FORMAT_BC3", isSrgb: false, isNormal: false, sizes.mask, outDir, assetPrefix);
             }
             else
-                WriteDefaultMask(idx, outDir, assetPrefix);
+                WriteDefaultMask(layer, idx, sizes.mask, outDir, assetPrefix);
         }
 
-        // Unity TerrainLayer mask is (R=metallic, G=AO, B=height, A=smoothness). When a layer has
-        // no mask map, Unity's terrain shader treats those as sensible defaults — critically B=0
-        // (no height). The engine's terrain shader uses mask.b for height-based blend; falling
-        // through to the shader's default-white sampler gives height=1, making unmasked layers
-        // dominate everywhere. Emit a 1×1 default mask to keep the math honest.
-        static void WriteDefaultMask(int layerIdx, string outDir, string assetPrefix)
+        static bool SmoothnessUsesDiffuseAlpha(TerrainLayer l) =>
+            l.smoothnessSource != TerrainLayerSmoothnessSource.ConstantOnly && l.diffuseTexture != null
+            && UnityEngine.Experimental.Rendering.GraphicsFormatUtility.HasAlphaChannel(l.diffuseTexture.graphicsFormat);
+
+        // A layer without a mask map renders in URP TerrainLit with metallic = layer.metallic,
+        // occlusion = maskMapRemapMax.g, smoothness = layer.smoothness * diffuse alpha and no height
+        // (B=0, which the engine's height blend needs). Bake exactly those into the engine mask.
+        static void WriteDefaultMask(TerrainLayer layer, int layerIdx, Vector2Int size, string outDir, string assetPrefix)
         {
-            Texture2D tex = null;
+            byte metallic = (byte)Mathf.RoundToInt(Mathf.Clamp01(layer.metallic) * 255f);
+            byte occlusion = (byte)Mathf.RoundToInt(Mathf.Clamp01(layer.maskMapRemapMax.y) * 255f);
+            bool perTexel = SmoothnessUsesDiffuseAlpha(layer);
+            Texture2D tex = null, readable = null, sized = null;
             try
             {
-                tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-                // R=0 metal, G=1 AO, B=0 height, A=0.5 smoothness
-                tex.SetPixel(0, 0, new Color(0f, 1f, 0f, 0.5f));
+                tex = new Texture2D(size.x, size.y, TextureFormat.RGBA32, false, true);
+                var fill = new Color32[size.x * size.y];
+                if (perTexel)
+                {
+                    readable = HZGlbWriter.MakeReadable(layer.diffuseTexture, false);
+                    sized = (readable.width != size.x || readable.height != size.y)
+                        ? ResampleTiling(readable, size.x, size.y, isSrgb: false, isNormal: false) : readable;
+                    Color32[] diffuse = sized.GetPixels32();
+                    for (int i = 0; i < fill.Length; i++)
+                        fill[i] = new Color32(metallic, occlusion, 0, (byte)Mathf.RoundToInt(Mathf.Clamp01(layer.smoothness) * diffuse[i].a));
+                }
+                else
+                {
+                    var c = new Color32(metallic, occlusion, 0, (byte)Mathf.RoundToInt(Mathf.Clamp01(layer.smoothness) * 255f));
+                    for (int i = 0; i < fill.Length; i++) fill[i] = c;
+                }
+                tex.SetPixels32(fill);
                 tex.Apply(false, false);
                 File.WriteAllBytes(Path.Combine(outDir, $"layer{layerIdx}_mask.png"), tex.EncodeToPNG());
             }
             finally
             {
+                if (sized != null && sized != readable) UnityEngine.Object.DestroyImmediate(sized);
+                if (readable != null && readable != layer.diffuseTexture) UnityEngine.Object.DestroyImmediate(readable);
                 if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
             }
             WriteTextureSidecar(
                 path:      Path.Combine(outDir, $"layer{layerIdx}_mask.hzt"),
                 imagePath: $"/{assetPrefix}/layer{layerIdx}_mask",
                 format:    "TEX_FORMAT_BC3",
-                width:     1, height: 1, isSrgb: false);
-            Debug.Log($"[HZTerrain]   layer{layerIdx}_mask: 1x1 synthesized default (R=0 G=1 B=0 A=0.5)");
+                width:     size.x, height: size.y, isSrgb: false);
+            Debug.Log($"[HZTerrain]   layer{layerIdx}_mask: {size.x}x{size.y} synthesized (metallic={layer.metallic} occlusion={layer.maskMapRemapMax.y} smoothness={layer.smoothness}{(perTexel ? " * diffuse alpha" : "")})");
         }
 
         static void WriteLayerTex(Texture2D tex, int layerIdx, string kind, string format,
-            bool isSrgb, bool isNormal, string outDir, string assetPrefix)
+            bool isSrgb, bool isNormal, Vector2Int groupSize, string outDir, string assetPrefix, float normalScale = 1f)
         {
             if (tex == null) return;
             Texture2D readable = null;
+            Texture2D sized = null;
             try
             {
                 // MakeReadable handles DXT5nm normal unpacking + non-readable source textures
                 // via RenderTexture blit. Reuses the GLB path's helper.
                 readable = HZGlbWriter.MakeReadable(tex, isNormal);
-                byte[] png = readable.EncodeToPNG();
+                sized = readable;
+                if (readable.width != groupSize.x || readable.height != groupSize.y)
+                    sized = ResampleTiling(readable, groupSize.x, groupSize.y, isSrgb, isNormal);
+                if (isNormal && normalScale != 1f)
+                    BakeNormalScale(sized, normalScale);
+                byte[] png = sized.EncodeToPNG();
                 string pngPath = Path.Combine(outDir, $"layer{layerIdx}_{kind}.png");
                 File.WriteAllBytes(pngPath, png);
                 WriteTextureSidecar(
                     path:      Path.Combine(outDir, $"layer{layerIdx}_{kind}.hzt"),
                     imagePath: $"/{assetPrefix}/layer{layerIdx}_{kind}",
                     format:    format,
-                    width:     readable.width,
-                    height:    readable.height,
+                    width:     sized.width,
+                    height:    sized.height,
                     isSrgb:    isSrgb);
-                Debug.Log($"[HZTerrain]   layer{layerIdx}_{kind}: {readable.width}x{readable.height} ({tex.name})");
+                string resized = sized != readable ? $" resampled from {readable.width}x{readable.height} to match the layer group" : "";
+                Debug.Log($"[HZTerrain]   layer{layerIdx}_{kind}: {sized.width}x{sized.height} ({tex.name}){resized}");
             }
             finally
             {
+                if (sized != null && sized != readable) UnityEngine.Object.DestroyImmediate(sized);
                 if (readable != null && readable != tex) UnityEngine.Object.DestroyImmediate(readable);
             }
+        }
+
+        /// <summary>URP TerrainLit UnpackNormalScale: xy *= scale, z = sqrt(1 - saturate(dot(xy, xy))), then the
+        /// blended normal is normalized. Past unit length only xy's direction survives that normalize,
+        /// so it is stored as xy/|xy| (z = 0), which the engine's BC5 unpack reconstructs identically.</summary>
+        static void BakeNormalScale(Texture2D tex, float scale)
+        {
+            Color32[] px = tex.GetPixels32();
+            for (int i = 0; i < px.Length; i++)
+            {
+                float x = (px[i].r / 255f * 2f - 1f) * scale;
+                float y = (px[i].g / 255f * 2f - 1f) * scale;
+                float len2 = x * x + y * y;
+                if (len2 > 1f) { float inv = 1f / Mathf.Sqrt(len2); x *= inv; y *= inv; len2 = 1f; }
+                float z = Mathf.Sqrt(1f - len2);
+                px[i] = new Color32((byte)Mathf.RoundToInt((x * 0.5f + 0.5f) * 255f),
+                                    (byte)Mathf.RoundToInt((y * 0.5f + 0.5f) * 255f),
+                                    (byte)Mathf.RoundToInt((z * 0.5f + 0.5f) * 255f), px[i].a);
+            }
+            tex.SetPixels32(px);
+            tex.Apply(false, false);
+        }
+
+        /// <summary>Bilinear resample with wrap addressing (terrain layers tile). sRGB colour is
+        /// filtered in linear space and normals are renormalized, so only resolution changes.</summary>
+        static Texture2D ResampleTiling(Texture2D src, int dstW, int dstH, bool isSrgb, bool isNormal)
+        {
+            int sw = src.width, sh = src.height;
+            Color32[] sp = src.GetPixels32();
+            float[] toLinear = null;
+            if (isSrgb)
+            {
+                toLinear = new float[256];
+                for (int i = 0; i < 256; i++) toLinear[i] = Mathf.GammaToLinearSpace(i / 255f);
+            }
+            var dp = new Color32[dstW * dstH];
+            float sx = (float)sw / dstW, sy = (float)sh / dstH;
+            for (int y = 0; y < dstH; y++)
+            {
+                float fy = (y + 0.5f) * sy - 0.5f;
+                int y0 = Mathf.FloorToInt(fy);
+                float ty = fy - y0;
+                int r0 = ((y0 % sh) + sh) % sh * sw, r1 = (((y0 + 1) % sh) + sh) % sh * sw;
+                for (int x = 0; x < dstW; x++)
+                {
+                    float fx = (x + 0.5f) * sx - 0.5f;
+                    int x0 = Mathf.FloorToInt(fx);
+                    float tx = fx - x0;
+                    int c0 = ((x0 % sw) + sw) % sw, c1 = (((x0 + 1) % sw) + sw) % sw;
+                    Color32 a = sp[r0 + c0], b = sp[r0 + c1], c = sp[r1 + c0], d = sp[r1 + c1];
+                    float w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+                    float cr, cg, cb;
+                    if (isSrgb)
+                    {
+                        cr = Mathf.LinearToGammaSpace(toLinear[a.r] * w00 + toLinear[b.r] * w10 + toLinear[c.r] * w01 + toLinear[d.r] * w11);
+                        cg = Mathf.LinearToGammaSpace(toLinear[a.g] * w00 + toLinear[b.g] * w10 + toLinear[c.g] * w01 + toLinear[d.g] * w11);
+                        cb = Mathf.LinearToGammaSpace(toLinear[a.b] * w00 + toLinear[b.b] * w10 + toLinear[c.b] * w01 + toLinear[d.b] * w11);
+                    }
+                    else
+                    {
+                        cr = (a.r * w00 + b.r * w10 + c.r * w01 + d.r * w11) / 255f;
+                        cg = (a.g * w00 + b.g * w10 + c.g * w01 + d.g * w11) / 255f;
+                        cb = (a.b * w00 + b.b * w10 + c.b * w01 + d.b * w11) / 255f;
+                    }
+                    float ca = (a.a * w00 + b.a * w10 + c.a * w01 + d.a * w11) / 255f;
+                    if (isNormal)
+                    {
+                        var n = new Vector3(cr * 2f - 1f, cg * 2f - 1f, cb * 2f - 1f);
+                        n = n.sqrMagnitude > 1e-8f ? n.normalized : Vector3.forward;
+                        cr = n.x * 0.5f + 0.5f; cg = n.y * 0.5f + 0.5f; cb = n.z * 0.5f + 0.5f;
+                    }
+                    dp[y * dstW + x] = new Color32(
+                        (byte)Mathf.Clamp(Mathf.RoundToInt(cr * 255f), 0, 255),
+                        (byte)Mathf.Clamp(Mathf.RoundToInt(cg * 255f), 0, 255),
+                        (byte)Mathf.Clamp(Mathf.RoundToInt(cb * 255f), 0, 255),
+                        (byte)Mathf.Clamp(Mathf.RoundToInt(ca * 255f), 0, 255));
+                }
+            }
+            var dst = new Texture2D(dstW, dstH, TextureFormat.RGBA32, false, !isSrgb);
+            dst.SetPixels32(dp);
+            dst.Apply(false, false);
+            return dst;
         }
 
         // ---- grass (detail prototypes) ----
@@ -359,6 +503,12 @@ namespace HZExporter
             float wind = td.wavingGrassStrength;                   // global waving-grass strength
 
             int dw = td.detailWidth, dh = td.detailHeight;
+            // no detail patches: Unity scatters nothing, and ComputeDetailInstanceTransforms segfaults natively
+            if (dw <= 0 || dh <= 0)
+            {
+                Debug.LogWarning($"[HZTerrain] {protos.Length} detail prototype(s) but detail resolution is {dw}x{dh}; no grass exported");
+                return result;
+            }
             int maxScatter = Mathf.Max(1, td.maxDetailScatterPerRes);
 
             // instances_per_tile_max is calibrated to GROUND TRUTH: we ask Unity's own scatterer

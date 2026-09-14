@@ -255,6 +255,9 @@ namespace HZExporter.ShaderGraph
                     return litVal;
                 }
             }
+            // Unwired space slots read IN.<Space>Space<Kind> in Unity and ignore m_Value (NormalMaterialSlot.GetDefaultValue)
+            if (slot.Type == "NormalMaterialSlot" || slot.Type == "TangentMaterialSlot" || slot.Type == "PositionMaterialSlot")
+                return SpaceSlotDefault(slot, isVertexStage);
             if (t == SgType.Unknown)
             {
                 // DynamicValue/DynamicVector default to scalar — see SgRhs.cs
@@ -271,6 +274,34 @@ namespace HZExporter.ShaderGraph
             // Non-foldable fallback (currently mat4 only).
             string raw = LiteralAtAsString(slot.Value, t);
             return SgValue.Inline(Sg.Raw(raw), t);
+        }
+
+        // Engine equivalents of Unity's IN.<Space>Space{Normal,Tangent,Position}; same expressions as the node handlers
+        static SgValue SpaceSlotDefault(SgSlot slot, bool isVertexStage)
+        {
+            int space = slot.Space < 0 ? 0 : slot.Space;
+            bool world = space == 2 || space == 4;
+            string expr = null;
+            switch (slot.Type)
+            {
+                case "NormalMaterialSlot":
+                    if (space == 3) return SgValue.Inline(Sg.LitConst(SgConst.Vec(SgType.Vec3, 0.0, 0.0, 1.0)), SgType.Vec3);
+                    if (world) expr = isVertexStage ? "normalize((v.model * vec4(v.normal, 0.0)).xyz)" : "v_normal";
+                    else if (space == 0 && isVertexStage) expr = "v.normal";
+                    break;
+                case "TangentMaterialSlot":
+                    if (world) expr = isVertexStage ? "normalize((v.model * vec4(v.tangent.xyz, 0.0)).xyz)" : "v_tangent";
+                    else if (space == 0 && isVertexStage) expr = "v.tangent.xyz";
+                    break;
+                case "PositionMaterialSlot":
+                    if (world) expr = isVertexStage ? "(v.model * vec4(v.pos, 1.0)).xyz" : "v_world_pos";
+                    else if (space == 0) expr = isVertexStage ? "v.pos" : "v_object_pos";
+                    break;
+            }
+            if (expr == null)
+                throw new NotImplementedException(
+                    $"unwired {slot.Type} '{slot.DisplayName}' in space {space} ({(isVertexStage ? "vertex" : "fragment")} stage) has no engine equivalent");
+            return SgValue.Inline(Sg.Raw(expr), SgType.Vec3);
         }
 
         static bool TryParseConst(object value, SgType t, out SgConst c)
@@ -719,6 +750,26 @@ namespace HZExporter.ShaderGraph
 
     // MainLightDirectionNode: the engine's primary directional light, points
     // FROM the light. Unity's convention is the same.
+    // CameraNode: engine camera is always perspective, reverse-Z; width/height/direction have no uniform.
+    class CameraNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            switch (outSlotNum)
+            {
+                case 0: return new SgValue { Rhs = Sg.Raw("hz_scene.camera_pos"), Type = SgType.Vec3, IsTemp = false };
+                case 2: return Inline("0.0");
+                case 3: return Inline("hz_scene.cluster.near_plane");
+                case 4: return Inline("hz_scene.cluster.far_plane");
+                case 5: return Inline("-1.0");
+                default:
+                    throw new System.NotImplementedException($"CameraNode slot {outSlotNum} not supported (engine has no uniform for it)");
+            }
+        }
+        static SgValue Inline(string expr) =>
+            new SgValue { Rhs = Sg.Raw(expr), Type = SgType.Float, IsTemp = false };
+    }
+
     class MainLightDirectionNodeHandler : NodeHandler
     {
         public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
@@ -1320,7 +1371,8 @@ namespace HZExporter.ShaderGraph
             // INTO the surface) and break every downstream TBN multiply.
             // unpack_normal_bc5 reads .rg, decodes, and reconstructs Z.
             string template = texRef.IsNormalMap
-                ? $"vec4(unpack_normal_bc5(texture_sample({texRef.FieldName}, mat.{texRef.FieldName}, {{0}}).rg), 1.0)"
+                // cooked normal maps are Y-flipped for the engine frame; undo it so graph math sees Unity's sample (LIT_LIGHTING re-flips normal_ts)
+                ? $"vec4(unpack_normal_bc5(texture_sample({texRef.FieldName}, mat.{texRef.FieldName}, {{0}}).rg) * vec3(1.0, -1.0, 1.0), 1.0)"
                 : $"texture_sample({texRef.FieldName}, mat.{texRef.FieldName}, {{0}})";
             return ctx.EmitTemp(SgType.Vec4, Sg.RawTemplate(template, uvRhs));
         }
@@ -1572,6 +1624,7 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             _handlers["TimeNode"]                = new TimeNodeHandler();
             _handlers["NormalVectorNode"]        = new NormalVectorNodeHandler();
             _handlers["MainLightDirectionNode"]  = new MainLightDirectionNodeHandler();
+            _handlers["CameraNode"]              = new CameraNodeHandler();
             _handlers["GradientNode"]            = new GradientNodeHandler();
             _handlers["SampleGradient"]          = new SampleGradientHandler();
             _handlers["RedirectNodeData"]        = new RedirectNodeDataHandler();

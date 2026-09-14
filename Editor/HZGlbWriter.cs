@@ -2135,13 +2135,18 @@ namespace HZExporter
                         RenderTexture.ReleaseTemporary(rt);
                     }
 
+                    // A normal map imported as a Default sRGB texture is sampled sRGB-decoded by Unity before UnpackNormal
+                    var importer = UnityEditor.AssetImporter.GetAtPath(path) as UnityEditor.TextureImporter;
+                    bool decodeSrgb = importer != null && importer.textureType != UnityEditor.TextureImporterType.NormalMap && importer.sRGBTexture;
                     // Source PNGs are authored in DirectX tangent-space (+Y down). The engine's TBN
                     // math uses OpenGL convention (+Y up), so flip Y and recompute Z from X/Y.
                     Color[] pixels = sized.GetPixels();
                     for (int i = 0; i < pixels.Length; i++)
                     {
-                        float nx = pixels[i].r * 2f - 1f;
-                        float ny = -(pixels[i].g * 2f - 1f);
+                        float pr = decodeSrgb ? Mathf.GammaToLinearSpace(pixels[i].r) : pixels[i].r;
+                        float pg = decodeSrgb ? Mathf.GammaToLinearSpace(pixels[i].g) : pixels[i].g;
+                        float nx = pr * 2f - 1f;
+                        float ny = -(pg * 2f - 1f);
                         float nz = Mathf.Sqrt(Mathf.Max(0f, 1f - nx * nx - ny * ny));
                         pixels[i] = new Color(nx * 0.5f + 0.5f, ny * 0.5f + 0.5f, nz * 0.5f + 0.5f, 1f);
                     }

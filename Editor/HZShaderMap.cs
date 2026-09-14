@@ -582,6 +582,9 @@ namespace HZExporter
                 if (entry.shadowKeywords != null)
                     foreach (var name in entry.shadowKeywords)
                         cm.shadowKeywords.Add(new HZKeywordReader.KeywordKV { name = name, value = "" });
+                // the shadow caster clips exactly like the forward pass
+                foreach (var kw in cm.keywords)
+                    if (kw.name == "_ALPHATEST_ON") cm.shadowKeywords.Add(kw);
             }
 
             foreach (var p in entry.properties ?? new List<PropertyMap>())

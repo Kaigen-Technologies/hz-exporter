@@ -397,6 +397,264 @@
         { "unity": "_Metal1smootness",      "slot": "metal_smoothness",     "kind": "float" },
         { "unity": "_Ceramic1smoothness",   "slot": "ceramic_smoothness",   "kind": "float" }
       ]
+    },
+    {
+      "unityShader": "Shader Graphs/S_Simple_Assets",
+      "engineShader": "/shaders/unity/s_simple_assets.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/s_simple_assets.hz.glsl",
+      "customShader": true,
+      "shadowShader": "/shaders/unity/s_simple_assets_shadow.hz.glsl",
+      "shadowKeywords": [],
+      "properties": [
+        {
+          "unity": "_Basemap",
+          "slot": "basemap",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Normal_T",
+          "slot": "normal_t",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_UV",
+          "slot": "uv",
+          "kind": "float"
+        },
+        {
+          "unity": "_ORM",
+          "slot": "orm",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Normal",
+          "slot": "normal",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metal",
+          "slot": "metal",
+          "kind": "float"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_AO_Strength",
+          "slot": "ao_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_0_0_1",
+          "slot": "p_0_0_1",
+          "kind": "vec3"
+        },
+        {
+          "unity": "_OpacityMap",
+          "slot": "opacity_map",
+          "kind": "texture"
+        }
+      ]
+    },
+    {
+      "unityShader": "Shader Graphs/S_Leaves",
+      "engineShader": "/shaders/unity/s_leaves.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/s_leaves.hz.glsl",
+      "customShader": true,
+      "shadowShader": "/shaders/unity/s_leaves_shadow.hz.glsl",
+      "shadowKeywords": [],
+      "properties": [
+        {
+          "unity": "_LeafColorTint",
+          "slot": "leaf_color_tint",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Texture2D",
+          "slot": "texture_2d",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Roughness",
+          "slot": "roughness",
+          "kind": "float"
+        },
+        {
+          "unity": "_AlphaTexture",
+          "slot": "alpha_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Metal",
+          "slot": "metal",
+          "kind": "float"
+        }
+      ]
+    },
+    {
+      "unityShader": "Shader Graphs/S_Clasters",
+      "engineShader": "/shaders/unity/s_clasters.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/s_clasters.hz.glsl",
+      "customShader": true,
+      "shadowShader": "/shaders/unity/s_clasters_shadow.hz.glsl",
+      "shadowKeywords": [],
+      "properties": [
+        {
+          "unity": "_Texture2D",
+          "slot": "texture_2d",
+          "kind": "texture"
+        },
+        {
+          "unity": "_ColorTint",
+          "slot": "color_tint",
+          "kind": "color4"
+        },
+        {
+          "unity": "_ColorTint_1",
+          "slot": "color_tint_1",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metallic",
+          "slot": "metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_AO_Strenght",
+          "slot": "ao_strenght",
+          "kind": "float"
+        },
+        {
+          "unity": "_Roughness",
+          "slot": "roughness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Normal",
+          "slot": "normal",
+          "kind": "float"
+        },
+        {
+          "unity": "_Normal_1",
+          "slot": "normal_1",
+          "kind": "texture_normal"
+        }
+      ]
+    },
+    {
+      "unityShader": "Shader Graphs/S_FireSheet",
+      "engineShader": "/shaders/unity/s_fire_sheet.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/s_fire_sheet.hz.glsl",
+      "customShader": true,
+      "isTransparent": true,
+      "properties": [
+        {
+          "unity": "Texture2D_e4999f2b558b4a59a231154943f521c7",
+          "slot": "texture_2d_e_4999f_2b_558b_4a_59a_231154943f_521c_7",
+          "kind": "texture"
+        },
+        {
+          "unity": "Texture2D_08afc45cb8bc4ac292bd58281906f3fa",
+          "slot": "texture_2d_08afc_45cb_8bc_4ac_292bd_58281906f_3fa",
+          "kind": "texture"
+        },
+        {
+          "unity": "Vector1_4defa7947c804815877ebc2a3a5932d0",
+          "slot": "vector_1_4defa_7947c_804815877ebc_2a_3a_5932d_0",
+          "kind": "float"
+        },
+        {
+          "unity": "Vector1_2ac559e28a204783a17ce5231b490ebd",
+          "slot": "vector_1_2ac_559e_28a_204783a_17ce_5231b_490ebd",
+          "kind": "float"
+        },
+        {
+          "unity": "Vector1_c32df45d484442f7bf6414c462e397bc",
+          "slot": "vector_1_c_32df_45d_484442f_7bf_6414c_462e_397bc",
+          "kind": "float"
+        }
+      ]
+    },
+    {
+      "unityShader": "Shader Graphs/S_WaterShader",
+      "engineShader": "/shaders/unity/s_water_shader.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/s_water_shader.hz.glsl",
+      "customShader": true,
+      "isTransparent": true,
+      "properties": [
+        {
+          "unity": "Color_36218622185947c6a5ae36366d8e21d8",
+          "slot": "color_36218622185947c_6a_5ae_36366d_8e_21d_8",
+          "kind": "color4"
+        },
+        {
+          "unity": "Color_93e06cd551a5449091bcde90b46765a0",
+          "slot": "color_93e_06cd_551a_5449091bcde_90b_46765a_0",
+          "kind": "color4"
+        },
+        {
+          "unity": "Vector1_6f56a0970372485390c6587863c2374e",
+          "slot": "vector_1_6f_56a_0970372485390c_6587863c_2374e",
+          "kind": "float"
+        },
+        {
+          "unity": "Vector1_6c82dffdd68049bcb019d3a9c64c92a0",
+          "slot": "vector_1_6c_82dffdd_68049bcb_019d_3a_9c_64c_92a_0",
+          "kind": "float"
+        },
+        {
+          "unity": "Vector1_6269b1025b26473ca8bc61634f34b537",
+          "slot": "vector_1_6269b_1025b_26473ca_8bc_61634f_34b_537",
+          "kind": "float"
+        },
+        {
+          "unity": "Vector1_7273530c27a34c9f8ee5723b84f96baa",
+          "slot": "vector_1_7273530c_27a_34c_9f_8ee_5723b_84f_96baa",
+          "kind": "float"
+        },
+        {
+          "unity": "Texture2D_6d0f902902b04ba687ee00a51db7ba6d",
+          "slot": "texture_2d_6d_0f_902902b_04ba_687ee_00a_51db_7ba_6d",
+          "kind": "texture"
+        },
+        {
+          "unity": "Texture2D_786b67b3efe14204b2f06f9afb9d8cf1",
+          "slot": "texture_2d_786b_67b_3efe_14204b_2f_06f_9afb_9d_8cf_1",
+          "kind": "texture"
+        },
+        {
+          "unity": "Vector1_687f54e8c371429f86b9eaab0e7dfe3e",
+          "slot": "vector_1_687f_54e_8c_371429f_86b_9eaab_0e_7dfe_3e",
+          "kind": "float"
+        },
+        {
+          "unity": "Vector2_4351ac2be1d74054986ec5378db9d578",
+          "slot": "vector_2_4351ac_2be_1d_74054986ec_5378db_9d_578",
+          "kind": "vec2"
+        },
+        {
+          "unity": "Boolean_d3c978b0d14a4f66be175a9b89855be0",
+          "slot": "boolean_d_3c_978b_0d_14a_4f_66be_175a_9b_89855be_0",
+          "kind": "float"
+        },
+        {
+          "unity": "Texture2D_28de85506601443d82b6148f21ccc69c",
+          "slot": "texture_2d_28de_85506601443d_82b_6148f_21ccc_69c",
+          "kind": "texture"
+        },
+        {
+          "unity": "Vector1_dada42ebfac44076897b6de67441ba32",
+          "slot": "vector_1_dada_42ebfac_44076897b_6de_67441ba_32",
+          "kind": "float"
+        },
+        {
+          "unity": "Vector1_55003dfa023448c3bffa42f3ca4a99a4",
+          "slot": "vector_1_55003dfa_023448c_3bffa_42f_3ca_4a_99a_4",
+          "kind": "float"
+        }
+      ]
     }
   ],
   "customFunctions": [

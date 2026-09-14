@@ -206,6 +206,7 @@ namespace HZExporter.ShaderGraph
         public string DisplayName;   // m_DisplayName (used to look up slots by name from handlers)
         public bool IsOutput;        // m_SlotType: 0=input, 1=output
         public object Value;         // m_Value (preferred over m_DefaultValue — see SgParser)
+        public int Space = -1;       // m_Space on Normal/Tangent/Position slots (0 Object, 1 View, 2 World, 3 Tangent, 4 AbsoluteWorld)
 
         // Best-effort mapping from a static slot type to an SgType. Returns
         // Unknown for dynamic slots — those resolve at lowering time.
@@ -294,6 +295,7 @@ namespace HZExporter.ShaderGraph
     {
         public SgVariant Variant;
         public bool AlphaClip;                 // from active target's m_AlphaClip
+        public bool AllowMaterialOverride;     // m_AllowMaterialOverride: URP makes _ALPHATEST_ON a per-material keyword
         // True when this shader is listed in grass_shaders.json — the codegen then
         // emits a sibling `<name>_grass.hz.glsl` whose @fs/@material are byte-identical
         // to the forward shader but whose @vs pulls from the grass SSBOs. Set by the

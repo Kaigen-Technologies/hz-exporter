@@ -92,6 +92,14 @@ namespace HZExporter
                     });
                 }
             }
+            // URP target keyword: per-material only when the graph allows material override
+            if (graph.AllowMaterialOverride && mat.IsKeywordEnabled("_ALPHATEST_ON"))
+            {
+                if (graph.AlphaClip)
+                    result.Add(new KeywordKV { name = "_ALPHATEST_ON", value = "" });
+                else
+                    Debug.LogWarning($"[HZKeywordReader] '{mat.name}' enables _ALPHATEST_ON but its graph has Alpha Clipping off; the translated shader has no alpha path, so it renders unclipped");
+            }
             return result;
         }
     }
