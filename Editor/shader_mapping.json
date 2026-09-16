@@ -1214,7 +1214,293 @@
       "engineShader": "/shaders/unity/custom_lighting_buildings_b_lod.hz.glsl",
       "engineSkinnedShader": "/shaders/unity/custom_lighting_buildings_b_lod.hz.glsl",
       "customShader": true,
-      "properties": []
+      "properties": [
+        {
+          "unity": "_Inset_Y_Max",
+          "slot": "inset_y_max",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindowHeight",
+          "slot": "window_height",
+          "kind": "float"
+        },
+        {
+          "unity": "_BaseColor",
+          "slot": "base_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_debugPower",
+          "slot": "debug_power",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindowSmoothness",
+          "slot": "window_smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Max_Windows_Y",
+          "slot": "max_windows_y",
+          "kind": "float"
+        },
+        {
+          "unity": "_WallSmoothness",
+          "slot": "wall_smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metallic",
+          "slot": "metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_Reflectance",
+          "slot": "reflectance",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindowMask",
+          "slot": "window_mask",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Inset_Y",
+          "slot": "inset_y",
+          "kind": "float"
+        },
+        {
+          "unity": "_YPosition",
+          "slot": "y_position",
+          "kind": "float"
+        },
+        {
+          "unity": "_Min_Windows_Y",
+          "slot": "min_windows_y",
+          "kind": "float"
+        },
+        {
+          "unity": "_Tint3",
+          "slot": "tint_3",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Tint4",
+          "slot": "tint_4",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Tint2",
+          "slot": "tint_2",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Tint1",
+          "slot": "tint_1",
+          "kind": "color4"
+        },
+        {
+          "unity": "_RandomOn",
+          "slot": "random_on",
+          "kind": "float"
+        },
+        {
+          "unity": "_random_Colors",
+          "slot": "random_colors",
+          "kind": "float"
+        },
+        {
+          "unity": "_Seed",
+          "slot": "seed",
+          "kind": "float"
+        },
+        {
+          "unity": "_Exposure",
+          "slot": "exposure",
+          "kind": "float"
+        },
+        {
+          "unity": "_RandomXZScale",
+          "slot": "random_xz_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_Windows_X",
+          "slot": "windows_x",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindowWidth",
+          "slot": "window_width",
+          "kind": "float"
+        },
+        {
+          "unity": "_Inset_X",
+          "slot": "inset_x",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindowSoften",
+          "slot": "window_soften",
+          "kind": "float"
+        },
+        {
+          "unity": "_LargePanelScale",
+          "slot": "large_panel_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_dirt",
+          "slot": "dirt",
+          "kind": "float"
+        },
+        {
+          "unity": "_LargePanelNormals",
+          "slot": "large_panel_normals",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_LargePanelAlbedo",
+          "slot": "large_panel_albedo",
+          "kind": "texture"
+        },
+        {
+          "unity": "_meshSCale",
+          "slot": "mesh_s_cale",
+          "kind": "float"
+        },
+        {
+          "unity": "_InteriorRooms",
+          "slot": "interior_rooms",
+          "kind": "float"
+        },
+        {
+          "unity": "_debugMult",
+          "slot": "debug_mult",
+          "kind": "float"
+        },
+        {
+          "unity": "_DebugColor",
+          "slot": "debug_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_BuildingNormalCombine_LOD_1a4e49f361b64a23bb96074e1f9baeec__LargePanelNormals_1965204363_Texture2D",
+          "slot": "building_normal_combine_lod_1a__cddb0c09",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_BuildingNormalCombine_LOD_1a4e49f361b64a23bb96074e1f9baeec__WindowMask_-1216845332_Texture2D",
+          "slot": "building_normal_combine_lod_1a__457b9fd1",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_SampleTexture2DLOD_a4d64c5096024d98933fc3a12ba5d9c2_Texture_1_Texture2D",
+          "slot": "sample_texture_2dlod_a_4d_64c_5_a5203bd9",
+          "kind": "texture"
+        },
+        {
+          "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
+          "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
+          "kind": "texture"
+        },
+        {
+          "unity": "_gSouthColor",
+          "slot": "g_south_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gTopColor",
+          "slot": "g_top_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gWestColor",
+          "slot": "g_west_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gNorthColor",
+          "slot": "g_north_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gEastColor",
+          "slot": "g_east_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gGradientRadius",
+          "slot": "g_gradient_radius",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightMin",
+          "slot": "g_height_min",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightMax",
+          "slot": "g_height_max",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightFalloff",
+          "slot": "g_height_falloff",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightOpacity",
+          "slot": "g_height_opacity",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightColor",
+          "slot": "g_height_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gDistanceMin",
+          "slot": "g_distance_min",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceMax",
+          "slot": "g_distance_max",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceFalloff",
+          "slot": "g_distance_falloff",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceOpacity",
+          "slot": "g_distance_opacity",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceCube",
+          "slot": "g_distance_cube",
+          "kind": "global_texture_cube"
+        },
+        {
+          "unity": "_SampleTexture2D_91324d0589854d039be0512d9719a785_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_91324d_058985_b354b3f2",
+          "kind": "texture"
+        },
+        {
+          "unity": "_SampleTexture2D_a0117470a5d844bb80d847ff764d689c_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_a_0117470a_5d_a3645c3f",
+          "kind": "texture"
+        }
+      ]
     },
     {
       "unityShader": "Shader Graphs/IlluminatedSigns",
@@ -3949,6 +4235,54 @@
         "    h ^= h >> 13u; h *= M; h ^= h >> 15u;",
         "    HzMurmurHash r;",
         "    r.p_out = uintBitsToFloat((h & 0x007fffffu) | 0x3f800000u) - 1.0;",
+        "    return r;",
+        "}"
+      ]
+    },
+    {
+      "name": "Hash32Fast",
+      "engineCall": "hz_hash32_fast",
+      "structType": "HzHash32Fast",
+      "structFields": [
+        "p_out"
+      ],
+      "glsl": [
+        "struct HzHash32Fast { vec3 p_out; };",
+        "",
+        "HzHash32Fast hz_hash32_fast(vec2 p) {",
+        "    uvec2 v = uvec2(ivec2(p));",
+        "    v.y ^= 1103515245u;",
+        "    v.x += v.y;",
+        "    v.x *= v.y;",
+        "    v.x ^= v.x >> 5u;",
+        "    v.x *= 0x27d4eb2du;",
+        "    HzHash32Fast r;",
+        "    r.p_out = vec3(float((v.x >> 31u) & 1u), float((v.x >> 30u) & 1u), float((v.x >> 29u) & 1u));",
+        "    return r;",
+        "}"
+      ]
+    },
+    {
+      "name": "Hash33Fast",
+      "engineCall": "hz_hash33_fast",
+      "structType": "HzHash33Fast",
+      "structFields": [
+        "p_out"
+      ],
+      "glsl": [
+        "struct HzHash33Fast { vec3 p_out; };",
+        "",
+        "HzHash33Fast hz_hash33_fast(vec3 p) {",
+        "    uvec3 v = uvec3(ivec3(p));",
+        "    v.x ^= 1103515245u;",
+        "    v.y ^= v.x + v.z;",
+        "    v.y = v.y * 134775813u;",
+        "    v.z += v.x ^ v.y;",
+        "    v.y += v.x ^ v.z;",
+        "    v.x += v.y * v.z;",
+        "    v.x = v.x * 0x27d4eb2du;",
+        "    HzHash33Fast r;",
+        "    r.p_out = vec3(float((v.x >> 31u) & 1u), float((v.x >> 30u) & 1u), float((v.x >> 29u) & 1u));",
         "    return r;",
         "}"
       ]

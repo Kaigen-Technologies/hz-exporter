@@ -277,6 +277,7 @@ namespace HZExporter.ShaderGraph
             bool needsObjScale = objScan.Contains("v_object_scale");
             bool needsTangent = objScan.Contains("v_tangent");
             bool needsBitan = objScan.Contains("v_bitangent_sign");
+            bool needsObjNrm = objScan.Contains("v_object_normal");
 
             // Lit graphs that leave Base Color unwired are "implicit unlit" (their
             // output is driven through Emission). Skip the PBR lighting block and
@@ -298,6 +299,9 @@ namespace HZExporter.ShaderGraph
                 .Replace("${VS_MAT_UNPACK}",  vsMatUnpack)
                 .Replace("${VS_HELPERS}",   vsHelpers.ToString() + vsFunctions.ToString())
                 .Replace("${HELPERS}",      fsHelpers.ToString())
+                .Replace("${VS_OBJNRM_OUT}",    needsObjNrm ? "out vec3 v_object_normal;\n" : "")
+                .Replace("${VS_OBJNRM_ASSIGN}", needsObjNrm ? "    v_object_normal = v.normal;\n" : "")
+                .Replace("${FS_OBJNRM_IN}",     needsObjNrm ? "in vec3 v_object_normal;\n" : "")
                 .Replace("${VS_BITAN_OUT}",    needsBitan ? "out float v_bitangent_sign;\n" : "")
                 .Replace("${VS_BITAN_ASSIGN}", needsBitan ? "    v_bitangent_sign = v.bitangent_sign;\n" : "")
                 .Replace("${FS_BITAN_IN}",     needsBitan ? "in float v_bitangent_sign;\n" : "")
@@ -640,6 +644,12 @@ namespace HZExporter.ShaderGraph
                 if (to == SgType.Vec2 || to == SgType.Vec3 || to == SgType.Vec4)
                     return Sg.Call(SgTypes.Glsl(to), r);
             }
+            // HLSL's (bool)f is f != 0; GLSL has no implicit numeric-to-bool conversion.
+            if (to == SgType.Bool && (from == SgType.Float || SgTypes.Rank(from) > 0))
+            {
+                var scalar = SgTypes.Rank(from) > 1 ? Sg.Swizzle(r, "x") : r;
+                return Sg.RawTemplate("({0} != 0.0)", scalar);
+            }
             // Unity silently reads a bool as 0/1; GLSL needs the explicit constructor.
             if (from == SgType.Bool)
             {
@@ -710,7 +720,7 @@ out vec2 v_uv1;
 out vec4 v_color;
 flat out uint v_material_offset;
 out vec3 v_normal;
-${VS_WORLD_POS_OUT}${VS_OBJECT_OUT}${VS_CI_OUT}${VS_TANGENT_OUT}${VS_BITAN_OUT}#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_OUT}${VS_OBJECT_OUT}${VS_CI_OUT}${VS_TANGENT_OUT}${VS_BITAN_OUT}${VS_OBJNRM_OUT}#ifdef HZ_RENDERER_GBUFFER
 out vec4 v_clip_cur;
 out vec4 v_clip_prev;
 #endif
@@ -725,7 +735,7 @@ ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0
     v_color = v.color;
     v_material_offset = v.material_offset;
     v_normal = normalize((v.model * vec4(${VS_NORMAL}, 0.0)).xyz);
-${VS_WORLD_POS_ASSIGN}${VS_OBJECT_ASSIGN}${VS_TANGENT_ASSIGN}${VS_BITAN_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_ASSIGN}${VS_OBJECT_ASSIGN}${VS_TANGENT_ASSIGN}${VS_BITAN_ASSIGN}${VS_OBJNRM_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
     // jitter-free motion vectors through the previous model; time-driven vertex motion stays camera-only
     v_clip_cur = hz_scene.view_proj_unjittered * world_pos;
     v_clip_prev = hz_scene.prev_view_proj * (unpack_prev_model() * vec4(${VS_POS}, 1.0));
@@ -740,7 +750,7 @@ in vec2 v_uv1;
 in vec4 v_color;
 flat in uint v_material_offset;
 in vec3 v_normal;
-${FS_WORLD_POS_IN}${FS_OBJECT_IN}${FS_CI_IN}${FS_TANGENT_IN}${FS_BITAN_IN}layout(location = 0) out vec4 frag_color;
+${FS_WORLD_POS_IN}${FS_OBJECT_IN}${FS_CI_IN}${FS_TANGENT_IN}${FS_BITAN_IN}${FS_OBJNRM_IN}layout(location = 0) out vec4 frag_color;
 ${GBUFFER_FS_OUTPUTS}
 ${MATERIAL_STRUCT}
 ${HELPERS}${FUNCTIONS}void main() {

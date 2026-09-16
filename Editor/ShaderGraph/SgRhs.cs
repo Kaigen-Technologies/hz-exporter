@@ -410,12 +410,16 @@ namespace HZExporter.ShaderGraph
                 string ctor = "vec" + minRank;
                 for (int i = 0; i < vs.Length; i++)
                 {
+                    var rhs = vs[i].Rhs;
                     int r = SgTypes.Rank(vs[i].Type);
+                    // a dynamic slot's literal carries no rank; treat it as the scalar it is
+                    if (vs[i].Type == SgType.Bool) { rhs = Call("float", rhs); r = 1; }
+                    else if (r == 0) r = 1;
                     // HLSL broadcasts a scalar into a genType slot; GLSL wants it spelled out,
                     // or mix(float, vec3, float) reaches the compiler unmatched.
-                    args[i] = r > minRank ? Swizzle(vs[i].Rhs, sw)
-                            : r == 1 ? Call(ctor, vs[i].Rhs)
-                            : vs[i].Rhs;
+                    args[i] = r > minRank ? Swizzle(rhs, sw)
+                            : r < minRank ? Call(ctor, rhs)
+                            : rhs;
                 }
             }
             return new SgRhsCall { Func = fn, Args = new List<SgRhs>(args) };

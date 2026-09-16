@@ -82,6 +82,9 @@ namespace HZExporter.ShaderGraph
                 }
                 if (s.Rhs.TryAsConst(known, out var c))
                 {
+                    // A vec3 temp whose value folds to 0 must stay a vec3 constant: inlining the
+                    // bare scalar loses the rank and downstream emits mix(0.0, vec3, vec3).
+                    c = WidenConst(c, s.Type);
                     s.Rhs = Sg.LitConst(c);
                     known[s.Name] = c;
                     changed = true;
@@ -94,6 +97,16 @@ namespace HZExporter.ShaderGraph
                 if (pc) { a.Rhs = prop; changed = true; }
             }
             return changed;
+        }
+
+        // Broadcast a scalar constant to the declared vector type of the slot it lands in.
+        static SgConst WidenConst(SgConst c, SgType want)
+        {
+            int rw = SgTypes.Rank(want);
+            if (rw <= 1 || c.Type != SgType.Float || c.Values == null || c.Values.Length != 1) return c;
+            var vals = new double[rw];
+            for (int i = 0; i < rw; i++) vals[i] = c.Values[0];
+            return SgConst.Vec(want, vals);
         }
 
         static (SgRhs rhs, bool changed) PropagateConsts(SgRhs r, Dictionary<string, SgConst> known)

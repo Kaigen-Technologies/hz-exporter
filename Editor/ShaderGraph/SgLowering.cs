@@ -318,7 +318,7 @@ namespace HZExporter.ShaderGraph
                 case "NormalMaterialSlot":
                     if (space == 3) return SgValue.Inline(Sg.LitConst(SgConst.Vec(SgType.Vec3, 0.0, 0.0, 1.0)), SgType.Vec3);
                     if (world) expr = isVertexStage ? "normalize((v.model * vec4(v.normal, 0.0)).xyz)" : "v_normal";
-                    else if (space == 0 && isVertexStage) expr = "v.normal";
+                    else if (space == 0) expr = isVertexStage ? "v.normal" : "v_object_normal";
                     break;
                 case "TangentMaterialSlot":
                     if (world) expr = isVertexStage ? "normalize((v.model * vec4(v.tangent.xyz, 0.0)).xyz)" : "v_tangent";
@@ -855,10 +855,13 @@ namespace HZExporter.ShaderGraph
             if (node.Raw.TryGetValue("m_Space", out var s) && s is double d) space = (int)d;
             switch (space)
             {
-                case 0: // Object — raw mesh normal in vertex stage; not available in @fs without an extra varying
-                    if (ctx.IsVertexStage)
-                        return new SgValue { Rhs = Sg.Raw("v.normal"), Type = SgType.Vec3, IsTemp = false };
-                    throw new System.NotImplementedException("NormalVectorNode space=Object in fragment stage needs an object-space varying");
+                case 0: // Object — raw mesh normal; @fs gets it through a varying emitted on demand
+                    return new SgValue
+                    {
+                        Rhs = Sg.Raw(ctx.IsVertexStage ? "v.normal" : "v_object_normal"),
+                        Type = SgType.Vec3,
+                        IsTemp = false,
+                    };
                 case 2: // World
                     if (ctx.IsVertexStage)
                         return new SgValue { Rhs = Sg.Raw("normalize((v.model * vec4(v.normal, 0.0)).xyz)"), Type = SgType.Vec3, IsTemp = false };
@@ -1443,8 +1446,12 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
             {
                 IsVertexStage = parentCtx.IsVertexStage,
                 IsSubGraph = parentCtx.IsSubGraph,
+                // without the root, a node-embedded resource inside the branch hoists into the
+                // wrong graph and its MaterialFS field is never declared
+                RootGraph = parentCtx.Root,
                 TempPrefix = $"{parentPath}_b{idx}_n",
             };
+            foreach (var kv in parentCtx.BoundProperties) branchCtx.BoundProperties[kv.Key] = kv.Value;
             // Lower the value flowing into the branch's input slot. This may
             // recursively emit temps into branchCtx.Statements (branch-local).
             var v = branchCtx.Input(node.Id, slotNum);
@@ -1457,6 +1464,8 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
             // branch's `{ }` block (which would shadow same-named helpers in
             // sibling branches).
             foreach (var h in branchCtx.HelperFunctions) parentCtx.HelperFunctions.Add(h);
+            if (branchCtx.UsesMaterial) parentCtx.UsesMaterial = true;
+            foreach (var ci in branchCtx.RequestedInterpolators) parentCtx.RequestedInterpolators[ci.Key] = ci.Value;
             return new SgConditionalBranch
             {
                 Define = define,
@@ -1607,8 +1616,7 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
                 case 17: inner = "(step(0.5, {1}) * max(2.0 * ({0} - 0.5), {1}) + (1.0 - step(0.5, {1})) * min(2.0 * {0}, {1}))"; break; // PinLight
                 case 15: inner = "(1.0 - (1.0 - {1}) * (1.0 - {0}))"; break;                     // Screen
                 case 19: inner = "({0} - {1})"; break;                                           // Subtract
-                case 21:                                                                          // Overwrite — passes through to mix(Base, Blend, Opacity)
-                    return ctx.EmitTemp(outT, Sg.CallPromote("mix", baseV, blendV, opV));
+                case 21: inner = "{1}"; break;                                                    // Overwrite — the formula IS Blend, so the shared mix below is the whole node
                 default:
                     // Unsupported modes (HardLight, HardMix, LinearLight, Overlay,
                     // SoftLight, VividLight) need step()-driven branching that's
