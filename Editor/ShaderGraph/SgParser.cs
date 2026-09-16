@@ -165,6 +165,36 @@ namespace HZExporter.ShaderGraph
             }
         }
 
+        // A resource dropped on a Sample node's slot becomes a hidden Unity material property named
+        // _<NodeName without spaces>_<nodeObjectId>_<slotOutputName>_<slotId>_<Type>. Mirroring that
+        // name exactly is what lets the material exporter read the value back off the Unity material.
+        static void AddInlineResourceProperty(SgGraph g, SgNode node, SgSlot slot, string slotId)
+        {
+            string concrete;
+            SgType type;
+            if (slot.Type == "Texture2DInputMaterialSlot") { concrete = "Texture2D"; type = SgType.Texture2D; }
+            else return;
+
+            string nodeName = node.Raw != null && node.Raw.TryGetValue("m_Name", out var nm) ? nm as string : null;
+            if (string.IsNullOrEmpty(nodeName)) return;
+            string refName = "_" + nodeName.Replace(" ", "") + "_" + node.Id + "_"
+                             + slot.OutputName + "_" + slot.NumId + "_" + concrete;
+
+            var prop = new SgProperty
+            {
+                Id = slotId,
+                Name = refName,
+                ReferenceName = refName,
+                Type = type,
+            };
+            prop.FieldName = MakeFieldName(prop.ReferenceName, prop.Name);
+            var lowered = refName.ToLowerInvariant();
+            prop.IsNormalMap = lowered.Contains("normal") || lowered.Contains("bump");
+            prop.IsInlineResource = true;
+            g.Properties.Add(prop);
+            g.InlinePropertyBySlotId[slotId] = prop;
+        }
+
         static SgType MapPropertyType(string fq)
         {
             if (fq.EndsWith(".ColorShaderProperty"))     return SgType.Vec4;
@@ -280,6 +310,7 @@ namespace HZExporter.ShaderGraph
                     {
                         if (!g.Slots.TryGetValue(sid, out var slot)) continue;
                         node.SlotByNum[slot.NumId] = sid;
+                        if (!slot.IsOutput) AddInlineResourceProperty(g, node, slot, sid);
                         if (!string.IsNullOrEmpty(slot.DisplayName))
                         {
                             node.SlotByName[slot.DisplayName] = slot.NumId;

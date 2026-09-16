@@ -203,7 +203,7 @@ namespace HZExporter.ShaderGraph
             // `mat.` substring in the rendered vsBody (the optimizer leaves
             // those references intact since `mat` is an opaque struct ref).
             string vsBodyStr = vsBody.ToString();
-            bool vsNeedsMaterial = vsBodyStr.Contains("mat.");
+            bool vsNeedsMaterial = vsBodyStr.Contains("mat.") || vsCtx.UsesMaterial;
             // `@material` is declared ONCE, in the first stage that reads it;
             // the engine preprocessor gives that stage the struct + unpack and
             // later stages inherit both. The grass @vs always reads it — the
@@ -330,7 +330,7 @@ namespace HZExporter.ShaderGraph
             body.Append(DiscardLine(g));
 
             string vsBodyStr = vsBody.ToString();
-            bool vsNeedsMaterial = vsBodyStr.Contains("mat.");
+            bool vsNeedsMaterial = vsBodyStr.Contains("mat.") || vsCtx.UsesMaterial;
             string vsMaterial = vsNeedsMaterial ? FormatMaterialStruct(g) : "";
             string fsMaterial = vsNeedsMaterial ? "" : FormatMaterialStruct(g);
             string vsMatUnpack = vsNeedsMaterial
@@ -494,7 +494,7 @@ namespace HZExporter.ShaderGraph
             // Parameter list — shared by both single- and struct-return forms.
             var paramStrs = new string[fn.Params.Count];
             for (int i = 0; i < fn.Params.Count; i++)
-                paramStrs[i] = SgTypes.Glsl(fn.Params[i].Type) + " " + fn.Params[i].Name;
+                paramStrs[i] = (fn.Params[i].TypeName ?? SgTypes.Glsl(fn.Params[i].Type)) + " " + fn.Params[i].Name;
             string paramList = string.Join(", ", paramStrs);
 
             var sb = new StringBuilder();

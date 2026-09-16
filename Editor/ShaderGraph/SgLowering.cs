@@ -67,6 +67,14 @@ namespace HZExporter.ShaderGraph
 
         public LowerCtx(SgGraph g) { Graph = g; }
 
+        // The top-level shader graph. Node-embedded resources found inside a subgraph are
+        // material properties of the FINAL shader, so they are hoisted here, not passed in.
+        public SgGraph RootGraph;
+        public SgGraph Root => RootGraph ?? Graph;
+        // Set when this body reads a MaterialFS field, so subgraph functions that sample a
+        // node-embedded texture take `mat` and the vertex stage knows to unpack it.
+        public bool UsesMaterial;
+
         public SgValue Output(string nodeId, int outSlotNum)
         {
             string key = nodeId + ":" + outSlotNum;
@@ -95,6 +103,16 @@ namespace HZExporter.ShaderGraph
             SgValue v;
             var edge = Graph.FindEdgeIntoSlot(nodeId, inSlotNum);
             if (edge != null) v = Output(edge.OutputNodeId, edge.OutputSlotIdNum);
+            else if (Graph.InlinePropertyBySlotId.TryGetValue(slotId, out var inlineProp))
+            {
+                UsesMaterial = true;
+                return new SgValue
+                {
+                    Rhs = new SgRhsTextureRef { FieldName = inlineProp.FieldName, IsNormalMap = inlineProp.IsNormalMap },
+                    Type = inlineProp.Type,
+                    IsTemp = false,
+                };
+            }
             else v = SgLiterals.From(consumerSlot, IsVertexStage);
 
             // Coerce to the consumer slot's declared type when it's strongly
@@ -573,6 +591,11 @@ namespace HZExporter.ShaderGraph
             // multi-output, primitive-typed for single-output. Args come from
             // the SubGraphNode's input slots, mapped to subgraph properties.
             var callArgs = ResolveCallArgs(node, sg, ctx);
+            if (fn.Params.Count > 0 && fn.Params[0].TypeName == "MaterialFS")
+            {
+                ctx.UsesMaterial = true;
+                callArgs.Insert(0, Sg.Raw("mat"));
+            }
             var callRhs = Sg.Call(fnName, callArgs.ToArray());
             var temp = fn.StructName != null
                 ? ctx.EmitStructTemp(fn.StructName, callRhs)
@@ -590,7 +613,7 @@ namespace HZExporter.ShaderGraph
             foreach (var n in sg.Nodes.Values) if (n.Type == "SubGraphOutputNode") { sgOut = n; break; }
             if (sgOut == null) throw new System.Exception($"subgraph {guid} has no SubGraphOutputNode");
 
-            var fnCtx = new LowerCtx(sg) { IsVertexStage = ctx.IsVertexStage, IsSubGraph = true };
+            var fnCtx = new LowerCtx(sg) { IsVertexStage = ctx.IsVertexStage, IsSubGraph = true, RootGraph = ctx.Root };
 
             // Subgraph properties become function parameters. PropertyNode
             // inside the subgraph body will reference them as bare names.
@@ -599,6 +622,9 @@ namespace HZExporter.ShaderGraph
             var fnParams = new List<SgFunctionParam>();
             foreach (var prop in sg.Properties)
             {
+                // A resource embedded on a node inside the subgraph belongs to the final
+                // shader's MaterialFS; it reaches the body through `mat`, not the call.
+                if (prop.IsInlineResource) { HoistInlineProperty(ctx.Root, prop); continue; }
                 if (prop.Type == SgType.Texture2D)
                     throw new System.NotImplementedException(
                         $"subgraph {guid}: Texture2D properties as subgraph inputs not yet supported");
@@ -636,6 +662,14 @@ namespace HZExporter.ShaderGraph
             // Promote nested SubGraphs' functions into the parent shader.
             ctx.Functions.AddRange(fnCtx.Functions);
 
+            // texture_sample's first argument is a compile-time identifier on non-bindless
+            // platforms, so a texture cannot travel as a value — the struct does instead.
+            if (fnCtx.UsesMaterial)
+            {
+                ctx.UsesMaterial = true;
+                fnParams.Insert(0, new SgFunctionParam { Name = "mat", TypeName = "MaterialFS" });
+            }
+
             var fn = new SgFunctionDef
             {
                 Name = fnName,
@@ -648,6 +682,13 @@ namespace HZExporter.ShaderGraph
             return fn;
         }
 
+        // Node-embedded resources are declared once on the final shader's MaterialFS.
+        static void HoistInlineProperty(SgGraph root, SgProperty prop)
+        {
+            foreach (var p in root.Properties) if (p.FieldName == prop.FieldName) return;
+            root.Properties.Add(prop);
+        }
+
         // For each subgraph property (in declaration order), find the
         // SubGraphNode input slot whose m_ShaderOutputName matches the
         // property's reference name, lower the value flowing in, and produce
@@ -657,6 +698,7 @@ namespace HZExporter.ShaderGraph
             var args = new List<SgRhs>();
             foreach (var prop in sg.Properties)
             {
+                if (prop.IsInlineResource) continue;   // reaches the body through `mat`
                 // Unity's m_Id can be any 32-bit signed integer (often a hash
                 // — negative is common for subgraph property slots). Use a
                 // separate `found` flag instead of a sentinel value so a
@@ -846,6 +888,17 @@ namespace HZExporter.ShaderGraph
         }
     }
 
+    // ShaderGraph angle nodes carry m_Unit: 0 = radians, 1 = degrees.
+    static class SgAngle
+    {
+        public static SgRhs ToRadians(SgNode node, SgRhs angle)
+        {
+            int unit = 0;
+            if (node.Raw.TryGetValue("m_Unit", out var u) && u is double d) unit = (int)d;
+            return unit == 1 ? Sg.RawTemplate("({0} * 0.01745329251994329577)", angle) : angle;
+        }
+    }
+
     // ConstantNode: Unity's ConstantType enum order is PI, TAU, PHI, E, SQRT2.
     class ConstantNodeHandler : NodeHandler
     {
@@ -865,6 +918,77 @@ namespace HZExporter.ShaderGraph
                 default: throw new System.NotImplementedException($"ConstantNode constant {which} not supported");
             }
             return SgValue.Inline(Sg.LitConst(SgConst.Scalar(v)), SgType.Float);
+        }
+    }
+
+    // RotateAboutAxisNode: Rodrigues rotation. m_Unit 0 = radians, 1 = degrees.
+    class RotateAboutAxisNodeHandler : NodeHandler
+    {
+        const string Helper =
+            "vec3 hz_sg_rotate_about_axis(vec3 v, vec3 axis, float angle) {\n" +
+            "    vec3 k = normalize(axis);\n" +
+            "    float s = sin(angle);\n" +
+            "    float c = cos(angle);\n" +
+            "    return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c);\n" +
+            "}";
+
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            ctx.HelperFunctions.Add(("hz_sg_rotate_about_axis", Helper));
+            var inv = ctx.Input(node.Id, 0);
+            var axis = ctx.Input(node.Id, 1);
+            var rot = ctx.Input(node.Id, 2);
+            var angle = SgAngle.ToRadians(node, rot.Rhs);
+            return ctx.EmitTemp(SgType.Vec3, Sg.Call("hz_sg_rotate_about_axis", inv.Rhs, axis.Rhs, angle));
+        }
+    }
+
+    // RotateNode: rotates UV about Center. Unity's rMatrix scale/bias round-trips to identity,
+    // so this is the plain 2x2 rotation applied as HLSL's row-vector mul.
+    class RotateNodeHandler : NodeHandler
+    {
+        const string Helper =
+            "vec2 hz_sg_rotate_uv(vec2 uv, vec2 center, float angle) {\n" +
+            "    vec2 p = uv - center;\n" +
+            "    float s = sin(angle);\n" +
+            "    float c = cos(angle);\n" +
+            "    return center + vec2(p.x * c + p.y * s, -p.x * s + p.y * c);\n" +
+            "}";
+
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            ctx.HelperFunctions.Add(("hz_sg_rotate_uv", Helper));
+            var uv = ctx.Input(node.Id, 0);
+            var center = ctx.Input(node.Id, 1);
+            var rot = ctx.Input(node.Id, 2);
+            var angle = SgAngle.ToRadians(node, rot.Rhs);
+            return ctx.EmitTemp(SgType.Vec2, Sg.Call("hz_sg_rotate_uv", uv.Rhs, center.Rhs, angle));
+        }
+    }
+
+    // FlipbookNode: Invert is node config (m_InvertX/m_InvertY), not a slot.
+    class FlipbookNodeHandler : NodeHandler
+    {
+        const string Helper =
+            "vec2 hz_sg_flipbook(vec2 uv, float width, float height, float tile, vec2 invert) {\n" +
+            "    vec2 tile_count = vec2(1.0) / vec2(width, height);\n" +
+            "    float base = floor(tile * tile_count.x);\n" +
+            "    float tile_y = abs(invert.y * height - (base + invert.y));\n" +
+            "    float tile_x = abs(invert.x * width - ((tile - width * base) + invert.x));\n" +
+            "    return (uv + vec2(tile_x, tile_y)) * tile_count;\n" +
+            "}";
+
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            ctx.HelperFunctions.Add(("hz_sg_flipbook", Helper));
+            bool ix = node.Raw.TryGetValue("m_InvertX", out var vx) && vx is bool bx && bx;
+            bool iy = node.Raw.TryGetValue("m_InvertY", out var vy) && vy is bool by && by;
+            var uv = ctx.Input(node.Id, 0);
+            var w = ctx.Input(node.Id, 1);
+            var h = ctx.Input(node.Id, 2);
+            var tile = ctx.Input(node.Id, 3);
+            var inv = Sg.Raw($"vec2({(ix ? "1.0" : "0.0")}, {(iy ? "1.0" : "0.0")})");
+            return ctx.EmitTemp(SgType.Vec2, Sg.Call("hz_sg_flipbook", uv.Rhs, w.Rhs, h.Rhs, tile.Rhs, inv));
         }
     }
 
@@ -1760,6 +1884,9 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             _handlers["MatrixSplitNode"]         = new MatrixSplitNodeHandler();
             _handlers["ViewDirectionNode"]       = new ViewDirectionNodeHandler();
             _handlers["ConstantNode"]            = new ConstantNodeHandler();
+            _handlers["RotateAboutAxisNode"]     = new RotateAboutAxisNodeHandler();
+            _handlers["RotateNode"]              = new RotateNodeHandler();
+            _handlers["FlipbookNode"]            = new FlipbookNodeHandler();
             _handlers["GradientNode"]            = new GradientNodeHandler();
             _handlers["SampleGradient"]          = new SampleGradientHandler();
             _handlers["RedirectNodeData"]        = new RedirectNodeDataHandler();

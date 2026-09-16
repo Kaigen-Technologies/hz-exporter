@@ -322,6 +322,8 @@ namespace HZExporter.ShaderGraph
     {
         public string Name;       // identifier as it appears in the function signature + body
         public SgType Type;
+        // GLSL type name override for params with no SgType (the MaterialFS struct).
+        public string TypeName;
     }
 
     class SgFunctionOutput

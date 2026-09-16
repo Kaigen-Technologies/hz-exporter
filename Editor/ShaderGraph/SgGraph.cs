@@ -278,6 +278,8 @@ namespace HZExporter.ShaderGraph
         // name containing "normal" or "bump" (heuristic — covers _Normal_Map,
         // _Coverage_Normal_Map, _BumpMap, _NormalTex etc.).
         public bool IsNormalMap;
+        // Node-embedded resource: a material property of the final shader, never a subgraph input.
+        public bool IsInlineResource;
     }
 
     class SgStickyNote
@@ -315,6 +317,10 @@ namespace HZExporter.ShaderGraph
         // m_ObjectId for PropertyNode lookups.
         public List<SgProperty> Properties = new List<SgProperty>();
         public Dictionary<string, SgProperty> PropertiesById = new Dictionary<string, SgProperty>();
+        // Node-embedded resource slots (a texture dropped straight onto a Sample node rather
+        // than wired from a property). Unity promotes these to hidden material properties, so
+        // they get an implicit SgProperty keyed by the slot they came from.
+        public Dictionary<string, SgProperty> InlinePropertyBySlotId = new Dictionary<string, SgProperty>();
 
         public List<SgKeyword> Keywords = new List<SgKeyword>();
         public Dictionary<string, SgKeyword> KeywordsById = new Dictionary<string, SgKeyword>();
