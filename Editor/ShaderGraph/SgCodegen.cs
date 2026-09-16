@@ -468,6 +468,11 @@ namespace HZExporter.ShaderGraph
                         sb.AppendLine("    @texture2D");
                         sb.Append("    uint ").Append(p.FieldName).AppendLine(";");
                     }
+                    else if (p.Type == SgType.TextureCube)
+                    {
+                        sb.AppendLine("    @textureCube");
+                        sb.Append("    uint ").Append(p.FieldName).AppendLine(";");
+                    }
                     else if (p.Type == SgType.SamplerState)
                     {
                         // engine uses a default sampler — skip

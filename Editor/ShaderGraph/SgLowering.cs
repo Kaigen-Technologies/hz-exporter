@@ -1080,6 +1080,23 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
         }
     }
 
+    // SampleRawCubemapNode: slots 0=Out, 1=Cube, 2=Dir, 3=Sampler, 4=LOD.
+    class SampleRawCubemapNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            var cube = ctx.Input(node.Id, 1);
+            if (!(cube.Rhs is SgRhsTextureRef texRef))
+                throw new System.NotImplementedException(
+                    "SampleRawCubemap: Cube input must come from a Cubemap property");
+            var dir = ctx.Input(node.Id, 2);
+            var lod = ctx.Input(node.Id, 4);
+            return ctx.EmitTemp(SgType.Vec4, Sg.RawTemplate(
+                $"texturecube_sample_lod({texRef.FieldName}, mat.{texRef.FieldName}, {{0}}, {{1}})",
+                dir.Rhs, lod.Rhs));
+        }
+    }
+
     // CameraNode: engine camera is always perspective, reverse-Z; width/height/direction have no uniform.
     class CameraNodeHandler : NodeHandler
     {
@@ -1607,11 +1624,11 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
             if (!ctx.Graph.PropertiesById.TryGetValue(propId, out var prop))
                 throw new System.Exception($"PropertyNode references unknown property '{propId}'");
 
-            if (prop.Type == SgType.Texture2D)
+            if (prop.Type == SgType.Texture2D || prop.Type == SgType.TextureCube)
                 return new SgValue
                 {
                     Rhs = new SgRhsTextureRef { FieldName = prop.FieldName, IsNormalMap = prop.IsNormalMap },
-                    Type = SgType.Texture2D,
+                    Type = prop.Type,
                     IsTemp = false,
                 };
 
@@ -2005,6 +2022,7 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             _handlers["RandomRangeNode"]         = new RandomRangeNodeHandler();
             _handlers["NoiseNode"]               = new NoiseNodeHandler();
             _handlers["ObjectNode"]              = new ObjectNodeHandler();
+            _handlers["SampleRawCubemapNode"]    = new SampleRawCubemapNodeHandler();
             _handlers["GradientNode"]            = new GradientNodeHandler();
             _handlers["SampleGradient"]          = new SampleGradientHandler();
             _handlers["RedirectNodeData"]        = new RedirectNodeDataHandler();

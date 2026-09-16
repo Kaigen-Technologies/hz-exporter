@@ -173,6 +173,7 @@ namespace HZExporter.ShaderGraph
             string concrete;
             SgType type;
             if (slot.Type == "Texture2DInputMaterialSlot") { concrete = "Texture2D"; type = SgType.Texture2D; }
+            else if (slot.Type == "CubemapInputMaterialSlot") { concrete = "Cubemap"; type = SgType.TextureCube; }
             else return;
 
             string nodeName = node.Raw != null && node.Raw.TryGetValue("m_Name", out var nm) ? nm as string : null;
@@ -199,6 +200,7 @@ namespace HZExporter.ShaderGraph
         {
             if (fq.EndsWith(".ColorShaderProperty"))     return SgType.Vec4;
             if (fq.EndsWith(".Texture2DShaderProperty")) return SgType.Texture2D;
+            if (fq.EndsWith(".CubemapShaderProperty"))   return SgType.TextureCube;
             if (fq.EndsWith(".Vector1ShaderProperty"))   return SgType.Float;
             if (fq.EndsWith(".Vector2ShaderProperty"))   return SgType.Vec2;
             if (fq.EndsWith(".Vector3ShaderProperty"))   return SgType.Vec3;

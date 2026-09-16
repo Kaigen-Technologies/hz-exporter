@@ -21,6 +21,7 @@ namespace HZExporter.ShaderGraph
         Vec3,
         Vec4,
         Mat4,
+        TextureCube,
         Bool,
         Texture2D,        // sampleable texture (engine binds to a uint handle)
         SamplerState,     // sampler — not yet emitted as a value
@@ -37,6 +38,7 @@ namespace HZExporter.ShaderGraph
                 case SgType.Vec3:  return "vec3";
                 case SgType.Vec4:  return "vec4";
                 case SgType.Mat4:      return "mat4";
+                case SgType.TextureCube: return "uint";
                 case SgType.Bool:      return "bool";
                 case SgType.Texture2D: return "uint";    // texture handles are uint indices in MaterialFS
             }
@@ -238,6 +240,9 @@ namespace HZExporter.ShaderGraph
                 case "Matrix4MaterialSlot":
                 case "DynamicMatrixMaterialSlot":
                     return SgType.Mat4;
+                case "CubemapMaterialSlot":
+                case "CubemapInputMaterialSlot":
+                    return SgType.TextureCube;
             }
             return SgType.Unknown;
         }
