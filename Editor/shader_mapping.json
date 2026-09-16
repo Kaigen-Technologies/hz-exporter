@@ -6,17 +6,61 @@
       "engineShader": "/shaders/renderer/standard_static.hz.glsl",
       "engineSkinnedShader": "/shaders/renderer/standard_skinned.hz.glsl",
       "properties": [
-        { "unity": "_BaseColor",        "slot": "baseColor",   "kind": "color4" },
-        { "unity": "_Color",            "slot": "baseColor",   "kind": "color4" },
-        { "unity": "_Metallic",         "slot": "metallic",    "kind": "float" },
-        { "unity": "_Smoothness",       "slot": "roughness",   "kind": "float_oneMinus" },
-        { "unity": "_EmissionColor",    "slot": "emissive",    "kind": "color3" },
-        { "unity": "_BaseMap",          "slot": "albedoTex",   "kind": "texture" },
-        { "unity": "_MainTex",          "slot": "albedoTex",   "kind": "texture" },
-        { "unity": "_BumpMap",          "slot": "normalTex",   "kind": "texture_normal" },
-        { "unity": "_EmissionMap",      "slot": "emissiveTex", "kind": "texture" },
-        { "unity": "_MetallicGlossMap", "slot": "ormTex",      "kind": "texture_orm_metalsmooth" },
-        { "unity": "_OcclusionMap",     "slot": "ormTex",      "kind": "texture_orm_occlusion" }
+        {
+          "unity": "_BaseColor",
+          "slot": "baseColor",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Color",
+          "slot": "baseColor",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Metallic",
+          "slot": "metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "roughness",
+          "kind": "float_oneMinus"
+        },
+        {
+          "unity": "_EmissionColor",
+          "slot": "emissive",
+          "kind": "color3"
+        },
+        {
+          "unity": "_BaseMap",
+          "slot": "albedoTex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_MainTex",
+          "slot": "albedoTex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_BumpMap",
+          "slot": "normalTex",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_EmissionMap",
+          "slot": "emissiveTex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_MetallicGlossMap",
+          "slot": "ormTex",
+          "kind": "texture_orm_metalsmooth"
+        },
+        {
+          "unity": "_OcclusionMap",
+          "slot": "ormTex",
+          "kind": "texture_orm_occlusion"
+        }
       ]
     },
     {
@@ -25,16 +69,56 @@
       "engineSkinnedShader": "/shaders/unity/wiggle.hz.glsl",
       "customShader": true,
       "properties": [
-        { "unity": "_Color",          "slot": "color",            "kind": "color4" },
-        { "unity": "_AlbedoTex",      "slot": "albedo_tex",       "kind": "texture" },
-        { "unity": "_MetallicGloss",  "slot": "metallic_gloss",   "kind": "texture" },
-        { "unity": "_Tints",          "slot": "tints",            "kind": "texture" },
-        { "unity": "_Smoothness",     "slot": "smoothness",       "kind": "float" },
-        { "unity": "_Metallic",       "slot": "metallic",         "kind": "float" },
-        { "unity": "_Wave1Frequency", "slot": "wave_1_frequency", "kind": "float" },
-        { "unity": "_Wave1Speed",     "slot": "wave_1_speed",     "kind": "float" },
-        { "unity": "_Distance",       "slot": "distance",         "kind": "float" },
-        { "unity": "_Offset",         "slot": "offset",           "kind": "float" }
+        {
+          "unity": "_Color",
+          "slot": "color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_AlbedoTex",
+          "slot": "albedo_tex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_MetallicGloss",
+          "slot": "metallic_gloss",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Tints",
+          "slot": "tints",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metallic",
+          "slot": "metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_Wave1Frequency",
+          "slot": "wave_1_frequency",
+          "kind": "float"
+        },
+        {
+          "unity": "_Wave1Speed",
+          "slot": "wave_1_speed",
+          "kind": "float"
+        },
+        {
+          "unity": "_Distance",
+          "slot": "distance",
+          "kind": "float"
+        },
+        {
+          "unity": "_Offset",
+          "slot": "offset",
+          "kind": "float"
+        }
       ]
     },
     {
@@ -42,11 +126,31 @@
       "engineShader": "/shaders/renderer/standard_static.hz.glsl",
       "engineSkinnedShader": "/shaders/renderer/standard_skinned.hz.glsl",
       "properties": [
-        { "unity": "_Color",           "slot": "baseColor",   "kind": "color4" },
-        { "unity": "_MainTexture",     "slot": "albedoTex",   "kind": "texture" },
-        { "unity": "_Normal",          "slot": "normalTex",   "kind": "texture_normal" },
-        { "unity": "_AO",              "slot": "ormTex",      "kind": "texture_orm_occlusion" },
-        { "unity": "_Matallic_Smooth", "slot": "ormTex",      "kind": "texture_orm_metalsmooth" }
+        {
+          "unity": "_Color",
+          "slot": "baseColor",
+          "kind": "color4"
+        },
+        {
+          "unity": "_MainTexture",
+          "slot": "albedoTex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Normal",
+          "slot": "normalTex",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_AO",
+          "slot": "ormTex",
+          "kind": "texture_orm_occlusion"
+        },
+        {
+          "unity": "_Matallic_Smooth",
+          "slot": "ormTex",
+          "kind": "texture_orm_metalsmooth"
+        }
       ]
     },
     {
@@ -54,8 +158,16 @@
       "engineShader": "/shaders/renderer/standard_static.hz.glsl",
       "engineSkinnedShader": "/shaders/renderer/standard_skinned.hz.glsl",
       "properties": [
-        { "unity": "_Color",   "slot": "baseColor", "kind": "color4" },
-        { "unity": "_MainTex", "slot": "albedoTex", "kind": "texture" }
+        {
+          "unity": "_Color",
+          "slot": "baseColor",
+          "kind": "color4"
+        },
+        {
+          "unity": "_MainTex",
+          "slot": "albedoTex",
+          "kind": "texture"
+        }
       ]
     },
     {
@@ -63,8 +175,16 @@
       "engineShader": "/shaders/renderer/standard_static.hz.glsl",
       "engineSkinnedShader": "/shaders/renderer/standard_skinned.hz.glsl",
       "properties": [
-        { "unity": "_Color",   "slot": "baseColor", "kind": "color4" },
-        { "unity": "_MainTex", "slot": "albedoTex", "kind": "texture" }
+        {
+          "unity": "_Color",
+          "slot": "baseColor",
+          "kind": "color4"
+        },
+        {
+          "unity": "_MainTex",
+          "slot": "albedoTex",
+          "kind": "texture"
+        }
       ]
     },
     {
@@ -73,18 +193,66 @@
       "engineSkinnedShader": "/shaders/unity/basic_shader.hz.glsl",
       "customShader": true,
       "properties": [
-        { "unity": "_Highlight_Intensity", "slot": "highlight_intensity", "kind": "float" },
-        { "unity": "_Choose_Line_Color",   "slot": "choose_line_color",   "kind": "float" },
-        { "unity": "_Line_Color_Darkness", "slot": "line_color_darkness", "kind": "float" },
-        { "unity": "_Highlight_Color",     "slot": "highlight_color",     "kind": "color4" },
-        { "unity": "_Color_1",             "slot": "color_1",             "kind": "color4" },
-        { "unity": "_Color_2",             "slot": "color_2",             "kind": "color4" },
-        { "unity": "_Color_3",             "slot": "color_3",             "kind": "color4" },
-        { "unity": "_Color_4",             "slot": "color_4",             "kind": "color4" },
-        { "unity": "_Line_Color",          "slot": "line_color",          "kind": "color4" },
-        { "unity": "_Base_Color_Texture",  "slot": "base_color_texture",  "kind": "texture" },
-        { "unity": "_ILM_Texture",         "slot": "ilm_texture",         "kind": "texture" },
-        { "unity": "_OLS_Texture",         "slot": "ols_texture",         "kind": "texture" }
+        {
+          "unity": "_Highlight_Intensity",
+          "slot": "highlight_intensity",
+          "kind": "float"
+        },
+        {
+          "unity": "_Choose_Line_Color",
+          "slot": "choose_line_color",
+          "kind": "float"
+        },
+        {
+          "unity": "_Line_Color_Darkness",
+          "slot": "line_color_darkness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Highlight_Color",
+          "slot": "highlight_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Color_1",
+          "slot": "color_1",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Color_2",
+          "slot": "color_2",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Color_3",
+          "slot": "color_3",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Color_4",
+          "slot": "color_4",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Line_Color",
+          "slot": "line_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Base_Color_Texture",
+          "slot": "base_color_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_ILM_Texture",
+          "slot": "ilm_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_OLS_Texture",
+          "slot": "ols_texture",
+          "kind": "texture"
+        }
       ]
     },
     {
@@ -93,26 +261,106 @@
       "engineSkinnedShader": "/shaders/unity/surface.hz.glsl",
       "customShader": true,
       "properties": [
-        { "unity": "_Color",                     "slot": "color",                     "kind": "color4" },
-        { "unity": "_Coverage_Color",            "slot": "coverage_color",            "kind": "color4" },
-        { "unity": "_Contrast",                  "slot": "contrast",                  "kind": "float" },
-        { "unity": "_Fade",                      "slot": "fade",                      "kind": "float" },
-        { "unity": "_Level",                     "slot": "level",                     "kind": "float" },
-        { "unity": "_Metallic",                  "slot": "metallic",                  "kind": "float" },
-        { "unity": "_Smoothness",                "slot": "smoothness",                "kind": "float" },
-        { "unity": "_Coverage_Smoothness",       "slot": "coverage_smoothness",       "kind": "float" },
-        { "unity": "_Normal_Strength",           "slot": "normal_strength",           "kind": "float" },
-        { "unity": "_Coverage_Normal_Strength",  "slot": "coverage_normal_strength",  "kind": "float" },
-        { "unity": "_Base_Map_Scale",            "slot": "base_map_scale",            "kind": "float" },
-        { "unity": "_Coverage_Map_Scale",        "slot": "coverage_map_scale",        "kind": "float" },
-        { "unity": "_Coverage_Mask_Scale",       "slot": "coverage_mask_scale",       "kind": "float" },
-        { "unity": "_Base_Map",                  "slot": "base_map",                  "kind": "texture" },
-        { "unity": "_Coverage_Base_Map",         "slot": "coverage_base_map",         "kind": "texture" },
-        { "unity": "_Normal_Map",                "slot": "normal_map",                "kind": "texture_normal" },
-        { "unity": "_Coverage_Normal_Map",       "slot": "coverage_normal_map",       "kind": "texture_normal" },
-        { "unity": "_Metallic_Map",              "slot": "metallic_map",              "kind": "texture" },
-        { "unity": "_Coverage_Metallic_Map",     "slot": "coverage_metallic_map",     "kind": "texture" },
-        { "unity": "_Coverage_Mask",             "slot": "coverage_mask",             "kind": "texture" }
+        {
+          "unity": "_Color",
+          "slot": "color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Coverage_Color",
+          "slot": "coverage_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Contrast",
+          "slot": "contrast",
+          "kind": "float"
+        },
+        {
+          "unity": "_Fade",
+          "slot": "fade",
+          "kind": "float"
+        },
+        {
+          "unity": "_Level",
+          "slot": "level",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metallic",
+          "slot": "metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Coverage_Smoothness",
+          "slot": "coverage_smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Normal_Strength",
+          "slot": "normal_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_Coverage_Normal_Strength",
+          "slot": "coverage_normal_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_Base_Map_Scale",
+          "slot": "base_map_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_Coverage_Map_Scale",
+          "slot": "coverage_map_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_Coverage_Mask_Scale",
+          "slot": "coverage_mask_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_Base_Map",
+          "slot": "base_map",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Coverage_Base_Map",
+          "slot": "coverage_base_map",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Normal_Map",
+          "slot": "normal_map",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_Coverage_Normal_Map",
+          "slot": "coverage_normal_map",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_Metallic_Map",
+          "slot": "metallic_map",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Coverage_Metallic_Map",
+          "slot": "coverage_metallic_map",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Coverage_Mask",
+          "slot": "coverage_mask",
+          "kind": "texture"
+        }
       ]
     },
     {
@@ -121,31 +369,131 @@
       "engineSkinnedShader": "/shaders/unity/character_base_shader.hz.glsl",
       "customShader": true,
       "properties": [
-        { "unity": "_Shadow_Sharpness",     "slot": "shadow_sharpness",     "kind": "float" },
-        { "unity": "_Choose_Line_Color",    "slot": "choose_line_color",    "kind": "float" },
-        { "unity": "_Line_Color_Darkness",  "slot": "line_color_darkness",  "kind": "float" },
-        { "unity": "_Skin_Color",           "slot": "skin_color",           "kind": "color4" },
-        { "unity": "_Nails_Color",          "slot": "nails_color",          "kind": "color4" },
-        { "unity": "_Blush_Color",          "slot": "blush_color",          "kind": "color4" },
-        { "unity": "_Makeup_Color",         "slot": "makeup_color",         "kind": "color4" },
-        { "unity": "_Eye_Color_Right_1",    "slot": "eye_color_right_1",    "kind": "color4" },
-        { "unity": "_Eye_Color_Right_2",    "slot": "eye_color_right_2",    "kind": "color4" },
-        { "unity": "_Eyeball_Color_Right",  "slot": "eyeball_color_right",  "kind": "color4" },
-        { "unity": "_Eye_Color_Left_1",     "slot": "eye_color_left_1",     "kind": "color4" },
-        { "unity": "_Eye_Color_Left_2",     "slot": "eye_color_left_2",     "kind": "color4" },
-        { "unity": "_Eyeball_Color_Left",   "slot": "eyeball_color_left",   "kind": "color4" },
-        { "unity": "_Eyelash_Color",        "slot": "eyelash_color",        "kind": "color4" },
-        { "unity": "_Tattoo_Color",         "slot": "tattoo_color",         "kind": "color4" },
-        { "unity": "_Line_Color",           "slot": "line_color",           "kind": "color4" },
-        { "unity": "_Body_Color_Texture",   "slot": "body_color_texture",   "kind": "texture" },
-        { "unity": "_Body_OLS_Texture",     "slot": "body_ols_texture",     "kind": "texture" },
-        { "unity": "_Face_Color_Texture",   "slot": "face_color_texture",   "kind": "texture" },
-        { "unity": "_Face_OLS_Texture",     "slot": "face_ols_texture",     "kind": "texture" },
-        { "unity": "_Eye_Texture",          "slot": "eye_texture",          "kind": "texture" },
-        { "unity": "_MouthLashTexture",     "slot": "mouth_lash_texture",   "kind": "texture" },
-        { "unity": "_MouthLashMask",        "slot": "mouth_lash_mask",      "kind": "texture" },
-        { "unity": "_EyeballColorMask",     "slot": "eyeball_color_mask",   "kind": "texture" },
-        { "unity": "_EyeballShadow",        "slot": "eyeball_shadow",       "kind": "texture" }
+        {
+          "unity": "_Shadow_Sharpness",
+          "slot": "shadow_sharpness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Choose_Line_Color",
+          "slot": "choose_line_color",
+          "kind": "float"
+        },
+        {
+          "unity": "_Line_Color_Darkness",
+          "slot": "line_color_darkness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Skin_Color",
+          "slot": "skin_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Nails_Color",
+          "slot": "nails_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Blush_Color",
+          "slot": "blush_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Makeup_Color",
+          "slot": "makeup_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Eye_Color_Right_1",
+          "slot": "eye_color_right_1",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Eye_Color_Right_2",
+          "slot": "eye_color_right_2",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Eyeball_Color_Right",
+          "slot": "eyeball_color_right",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Eye_Color_Left_1",
+          "slot": "eye_color_left_1",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Eye_Color_Left_2",
+          "slot": "eye_color_left_2",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Eyeball_Color_Left",
+          "slot": "eyeball_color_left",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Eyelash_Color",
+          "slot": "eyelash_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Tattoo_Color",
+          "slot": "tattoo_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Line_Color",
+          "slot": "line_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Body_Color_Texture",
+          "slot": "body_color_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Body_OLS_Texture",
+          "slot": "body_ols_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Face_Color_Texture",
+          "slot": "face_color_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Face_OLS_Texture",
+          "slot": "face_ols_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Eye_Texture",
+          "slot": "eye_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_MouthLashTexture",
+          "slot": "mouth_lash_texture",
+          "kind": "texture"
+        },
+        {
+          "unity": "_MouthLashMask",
+          "slot": "mouth_lash_mask",
+          "kind": "texture"
+        },
+        {
+          "unity": "_EyeballColorMask",
+          "slot": "eyeball_color_mask",
+          "kind": "texture"
+        },
+        {
+          "unity": "_EyeballShadow",
+          "slot": "eyeball_shadow",
+          "kind": "texture"
+        }
       ]
     },
     {
@@ -157,21 +505,81 @@
       "shadowShader": "/shaders/unity/vegetation_shadow.hz.glsl",
       "shadowKeywords": [],
       "properties": [
-        { "unity": "_Top_Color",            "slot": "top_color",            "kind": "color4" },
-        { "unity": "_Bottom_Color",         "slot": "bottom_color",         "kind": "color4" },
-        { "unity": "_Custom_Color",         "slot": "custom_color",         "kind": "float" },
-        { "unity": "_Enable_Top_Color",     "slot": "enable_top_color",     "kind": "float" },
-        { "unity": "_Blend_Height",         "slot": "blend_height",         "kind": "float" },
-        { "unity": "_Alpha_Cutoff",         "slot": "alpha_cutoff",         "kind": "float" },
-        { "unity": "_Bend_Strength",        "slot": "bend_strength",        "kind": "float" },
-        { "unity": "_Start_Bend_Range",     "slot": "start_bend_range",     "kind": "float" },
-        { "unity": "_Player_Position",      "slot": "player_position",      "kind": "vec3" },
-        { "unity": "_Wind_Direction",       "slot": "wind_direction",       "kind": "vec2" },
-        { "unity": "_Wind_Strength",        "slot": "wind_strength",        "kind": "float" },
-        { "unity": "_Wind_Speed",           "slot": "wind_speed",           "kind": "float" },
-        { "unity": "_Wind_Variation",       "slot": "wind_variation",       "kind": "float" },
-        { "unity": "_Wave_Scale",           "slot": "wave_scale",           "kind": "float" },
-        { "unity": "_Texture",              "slot": "texture",              "kind": "texture" }
+        {
+          "unity": "_Top_Color",
+          "slot": "top_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Bottom_Color",
+          "slot": "bottom_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Custom_Color",
+          "slot": "custom_color",
+          "kind": "float"
+        },
+        {
+          "unity": "_Enable_Top_Color",
+          "slot": "enable_top_color",
+          "kind": "float"
+        },
+        {
+          "unity": "_Blend_Height",
+          "slot": "blend_height",
+          "kind": "float"
+        },
+        {
+          "unity": "_Alpha_Cutoff",
+          "slot": "alpha_cutoff",
+          "kind": "float"
+        },
+        {
+          "unity": "_Bend_Strength",
+          "slot": "bend_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_Start_Bend_Range",
+          "slot": "start_bend_range",
+          "kind": "float"
+        },
+        {
+          "unity": "_Player_Position",
+          "slot": "player_position",
+          "kind": "vec3"
+        },
+        {
+          "unity": "_Wind_Direction",
+          "slot": "wind_direction",
+          "kind": "vec2"
+        },
+        {
+          "unity": "_Wind_Strength",
+          "slot": "wind_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_Wind_Speed",
+          "slot": "wind_speed",
+          "kind": "float"
+        },
+        {
+          "unity": "_Wind_Variation",
+          "slot": "wind_variation",
+          "kind": "float"
+        },
+        {
+          "unity": "_Wave_Scale",
+          "slot": "wave_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_Texture",
+          "slot": "texture",
+          "kind": "texture"
+        }
       ]
     },
     {
@@ -181,21 +589,81 @@
       "customShader": true,
       "isTransparent": true,
       "properties": [
-        { "unity": "_Deep_Color",            "slot": "deep_color",            "kind": "color4" },
-        { "unity": "_Shallow_Color",         "slot": "shallow_color",         "kind": "color4" },
-        { "unity": "_Foam_Color",            "slot": "foam_color",            "kind": "color4" },
-        { "unity": "_Smoothness",            "slot": "smoothness",            "kind": "float" },
-        { "unity": "_Foam_Density",          "slot": "foam_density",          "kind": "float" },
-        { "unity": "_Foam_Amount",           "slot": "foam_amount",           "kind": "float" },
-        { "unity": "_Water_Speed",           "slot": "water_speed",           "kind": "float" },
-        { "unity": "_Coast_Opacity",         "slot": "coast_opacity",         "kind": "float" },
-        { "unity": "_Depth_Distance",        "slot": "depth_distance",        "kind": "float" },
-        { "unity": "_Normal_Strength",       "slot": "normal_strength",       "kind": "float" },
-        { "unity": "_Refraction_Strength",   "slot": "refraction_strength",   "kind": "float" },
-        { "unity": "_Foam_Scale",            "slot": "foam_scale",            "kind": "vec2" },
-        { "unity": "_Refraction_Scale",      "slot": "refraction_scale",      "kind": "vec2" },
-        { "unity": "_Refraction_Normal",        "slot": "refraction_normal",        "kind": "texture_normal" },
-        { "unity": "_Second_Refraction_Normal", "slot": "second_refraction_normal", "kind": "texture_normal" }
+        {
+          "unity": "_Deep_Color",
+          "slot": "deep_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Shallow_Color",
+          "slot": "shallow_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Foam_Color",
+          "slot": "foam_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Foam_Density",
+          "slot": "foam_density",
+          "kind": "float"
+        },
+        {
+          "unity": "_Foam_Amount",
+          "slot": "foam_amount",
+          "kind": "float"
+        },
+        {
+          "unity": "_Water_Speed",
+          "slot": "water_speed",
+          "kind": "float"
+        },
+        {
+          "unity": "_Coast_Opacity",
+          "slot": "coast_opacity",
+          "kind": "float"
+        },
+        {
+          "unity": "_Depth_Distance",
+          "slot": "depth_distance",
+          "kind": "float"
+        },
+        {
+          "unity": "_Normal_Strength",
+          "slot": "normal_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_Refraction_Strength",
+          "slot": "refraction_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_Foam_Scale",
+          "slot": "foam_scale",
+          "kind": "vec2"
+        },
+        {
+          "unity": "_Refraction_Scale",
+          "slot": "refraction_scale",
+          "kind": "vec2"
+        },
+        {
+          "unity": "_Refraction_Normal",
+          "slot": "refraction_normal",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_Second_Refraction_Normal",
+          "slot": "second_refraction_normal",
+          "kind": "texture_normal"
+        }
       ]
     },
     {
@@ -205,20 +673,76 @@
       "customShader": true,
       "cullMode": "GPU_CULL_NONE",
       "properties": [
-        { "unity": "_BaseTexture",          "slot": "albedo",               "kind": "texture" },
-        { "unity": "_TopColor",             "slot": "top_color",            "kind": "color4" },
-        { "unity": "_GroundColor",          "slot": "ground_color",         "kind": "color4" },
-        { "unity": "_Gradient",             "slot": "gradient",             "kind": "float" },
-        { "unity": "_CUSTOMCOLORSTINTING",  "slot": "custom_color_tinting", "kind": "float" },
-        { "unity": "_Smoothness",           "slot": "smoothness",           "kind": "float" },
-        { "unity": "_SNOWONOFF",            "slot": "snow_enable",          "kind": "float" },
-        { "unity": "_SnowAmount",           "slot": "snow_amount",          "kind": "float" },
-        { "unity": "_SnowCoverage",         "slot": "snow_coverage",        "kind": "float" },
-        { "unity": "_SnowFade",             "slot": "snow_fade",            "kind": "float" },
-        { "unity": "_CUSTOMWIND",           "slot": "custom_wind",          "kind": "float" },
-        { "unity": "_WindMovement",         "slot": "wind_movement",        "kind": "float" },
-        { "unity": "_WindDensity",          "slot": "wind_density",         "kind": "float" },
-        { "unity": "_WindStrength",         "slot": "wind_strength",        "kind": "float" }
+        {
+          "unity": "_BaseTexture",
+          "slot": "albedo",
+          "kind": "texture"
+        },
+        {
+          "unity": "_TopColor",
+          "slot": "top_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_GroundColor",
+          "slot": "ground_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Gradient",
+          "slot": "gradient",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMCOLORSTINTING",
+          "slot": "custom_color_tinting",
+          "kind": "float"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_SNOWONOFF",
+          "slot": "snow_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowAmount",
+          "slot": "snow_amount",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowCoverage",
+          "slot": "snow_coverage",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowFade",
+          "slot": "snow_fade",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMWIND",
+          "slot": "custom_wind",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindMovement",
+          "slot": "wind_movement",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindDensity",
+          "slot": "wind_density",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindStrength",
+          "slot": "wind_strength",
+          "kind": "float"
+        }
       ]
     },
     {
@@ -228,23 +752,91 @@
       "customShader": true,
       "cullMode": "GPU_CULL_NONE",
       "properties": [
-        { "unity": "_BaseTexture",          "slot": "albedo",               "kind": "texture" },
-        { "unity": "_TopColor",             "slot": "top_color",            "kind": "color4" },
-        { "unity": "_GroundColor",          "slot": "ground_color",         "kind": "color4" },
-        { "unity": "_Gradient",             "slot": "gradient",             "kind": "float" },
-        { "unity": "_CUSTOMCOLORSTINTING",  "slot": "custom_color_tinting", "kind": "float" },
-        { "unity": "_Smoothness",           "slot": "smoothness",           "kind": "float" },
-        { "unity": "_LeavesThickness",      "slot": "leaves_thickness",     "kind": "float" },
-        { "unity": "_SNOWONOFF",            "slot": "snow_enable",          "kind": "float" },
-        { "unity": "_SnowAmount",           "slot": "snow_amount",          "kind": "float" },
-        { "unity": "_SnowCoverage",         "slot": "snow_coverage",        "kind": "float" },
-        { "unity": "_SnowGradient",         "slot": "snow_gradient",        "kind": "float" },
-        { "unity": "_TRANSLUCENCYONOFF",    "slot": "translucency_enable",  "kind": "float" },
-        { "unity": "_TransStrength",        "slot": "trans_strength",       "kind": "float" },
-        { "unity": "_CUSTOMWIND",           "slot": "custom_wind",          "kind": "float" },
-        { "unity": "_WindMovement",         "slot": "wind_movement",        "kind": "float" },
-        { "unity": "_WindDensity",          "slot": "wind_density",         "kind": "float" },
-        { "unity": "_WindStrength",         "slot": "wind_strength",        "kind": "float" }
+        {
+          "unity": "_BaseTexture",
+          "slot": "albedo",
+          "kind": "texture"
+        },
+        {
+          "unity": "_TopColor",
+          "slot": "top_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_GroundColor",
+          "slot": "ground_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Gradient",
+          "slot": "gradient",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMCOLORSTINTING",
+          "slot": "custom_color_tinting",
+          "kind": "float"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_LeavesThickness",
+          "slot": "leaves_thickness",
+          "kind": "float"
+        },
+        {
+          "unity": "_SNOWONOFF",
+          "slot": "snow_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowAmount",
+          "slot": "snow_amount",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowCoverage",
+          "slot": "snow_coverage",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowGradient",
+          "slot": "snow_gradient",
+          "kind": "float"
+        },
+        {
+          "unity": "_TRANSLUCENCYONOFF",
+          "slot": "translucency_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_TransStrength",
+          "slot": "trans_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMWIND",
+          "slot": "custom_wind",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindMovement",
+          "slot": "wind_movement",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindDensity",
+          "slot": "wind_density",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindStrength",
+          "slot": "wind_strength",
+          "kind": "float"
+        }
       ]
     },
     {
@@ -254,23 +846,91 @@
       "customShader": true,
       "cullMode": "GPU_CULL_NONE",
       "properties": [
-        { "unity": "_BaseTexture",          "slot": "albedo",               "kind": "texture" },
-        { "unity": "_TopColor",             "slot": "top_color",            "kind": "color4" },
-        { "unity": "_GroundColor",          "slot": "ground_color",         "kind": "color4" },
-        { "unity": "_Gradient",             "slot": "gradient",             "kind": "float" },
-        { "unity": "_CUSTOMCOLORSTINTING",  "slot": "custom_color_tinting", "kind": "float" },
-        { "unity": "_Smoothness",           "slot": "smoothness",           "kind": "float" },
-        { "unity": "_LeavesThickness",      "slot": "leaves_thickness",     "kind": "float" },
-        { "unity": "_SNOWONOFF",            "slot": "snow_enable",          "kind": "float" },
-        { "unity": "_SnowAmount",           "slot": "snow_amount",          "kind": "float" },
-        { "unity": "_SnowCoverage",         "slot": "snow_coverage",        "kind": "float" },
-        { "unity": "_SnowGradient",         "slot": "snow_gradient",        "kind": "float" },
-        { "unity": "_TRANSLUCENCYONOFF",    "slot": "translucency_enable",  "kind": "float" },
-        { "unity": "_TransStrength",        "slot": "trans_strength",       "kind": "float" },
-        { "unity": "_CUSTOMWIND",           "slot": "custom_wind",          "kind": "float" },
-        { "unity": "_WindMovement",         "slot": "wind_movement",        "kind": "float" },
-        { "unity": "_WindDensity",          "slot": "wind_density",         "kind": "float" },
-        { "unity": "_WindStrength",         "slot": "wind_strength",        "kind": "float" }
+        {
+          "unity": "_BaseTexture",
+          "slot": "albedo",
+          "kind": "texture"
+        },
+        {
+          "unity": "_TopColor",
+          "slot": "top_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_GroundColor",
+          "slot": "ground_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Gradient",
+          "slot": "gradient",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMCOLORSTINTING",
+          "slot": "custom_color_tinting",
+          "kind": "float"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_LeavesThickness",
+          "slot": "leaves_thickness",
+          "kind": "float"
+        },
+        {
+          "unity": "_SNOWONOFF",
+          "slot": "snow_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowAmount",
+          "slot": "snow_amount",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowCoverage",
+          "slot": "snow_coverage",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowGradient",
+          "slot": "snow_gradient",
+          "kind": "float"
+        },
+        {
+          "unity": "_TRANSLUCENCYONOFF",
+          "slot": "translucency_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_TransStrength",
+          "slot": "trans_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMWIND",
+          "slot": "custom_wind",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindMovement",
+          "slot": "wind_movement",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindDensity",
+          "slot": "wind_density",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindStrength",
+          "slot": "wind_strength",
+          "kind": "float"
+        }
       ]
     },
     {
@@ -280,20 +940,76 @@
       "customShader": true,
       "cullMode": "GPU_CULL_NONE",
       "properties": [
-        { "unity": "_BASETEXTURE",          "slot": "albedo",               "kind": "texture" },
-        { "unity": "_TopColor",             "slot": "top_color",            "kind": "color4" },
-        { "unity": "_GroundColor",          "slot": "ground_color",         "kind": "color4" },
-        { "unity": "_FLOWERSCOLOR",         "slot": "flowers_color",        "kind": "color4" },
-        { "unity": "_Gradient",             "slot": "gradient",             "kind": "float" },
-        { "unity": "_CUSTOMCOLORSTINTING",  "slot": "custom_color_tinting", "kind": "float" },
-        { "unity": "_CUSTOMFLOWERSCOLOR",   "slot": "custom_flowers_color", "kind": "float" },
-        { "unity": "_LeavesThickness",      "slot": "leaves_thickness",     "kind": "float" },
-        { "unity": "_TRANSLUCENCYONOFF",    "slot": "translucency_enable",  "kind": "float" },
-        { "unity": "_TransStrength",        "slot": "trans_strength",       "kind": "float" },
-        { "unity": "_CUSTOMWIND",           "slot": "custom_wind",          "kind": "float" },
-        { "unity": "_WindMovement",         "slot": "wind_movement",        "kind": "float" },
-        { "unity": "_WindDensity",          "slot": "wind_density",         "kind": "float" },
-        { "unity": "_WindStrength",         "slot": "wind_strength",        "kind": "float" }
+        {
+          "unity": "_BASETEXTURE",
+          "slot": "albedo",
+          "kind": "texture"
+        },
+        {
+          "unity": "_TopColor",
+          "slot": "top_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_GroundColor",
+          "slot": "ground_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_FLOWERSCOLOR",
+          "slot": "flowers_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Gradient",
+          "slot": "gradient",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMCOLORSTINTING",
+          "slot": "custom_color_tinting",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMFLOWERSCOLOR",
+          "slot": "custom_flowers_color",
+          "kind": "float"
+        },
+        {
+          "unity": "_LeavesThickness",
+          "slot": "leaves_thickness",
+          "kind": "float"
+        },
+        {
+          "unity": "_TRANSLUCENCYONOFF",
+          "slot": "translucency_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_TransStrength",
+          "slot": "trans_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_CUSTOMWIND",
+          "slot": "custom_wind",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindMovement",
+          "slot": "wind_movement",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindDensity",
+          "slot": "wind_density",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindStrength",
+          "slot": "wind_strength",
+          "kind": "float"
+        }
       ]
     },
     {
@@ -302,39 +1018,171 @@
       "engineSkinnedShader": "/shaders/polytope/pt_rock.hz.glsl",
       "customShader": true,
       "properties": [
-        { "unity": "_BaseTexture",                  "slot": "albedo",                "kind": "texture" },
-        { "unity": "_DetailTexture",                "slot": "detail_tex",            "kind": "texture" },
-        { "unity": "_TopProjectionTexture",         "slot": "top_tex",               "kind": "texture" },
-        { "unity": "_TopColor",                     "slot": "top_color",             "kind": "color4" },
-        { "unity": "_GroundColor",                  "slot": "ground_color",          "kind": "color4" },
-        { "unity": "_OreColor",                     "slot": "ore_color",             "kind": "color4" },
-        { "unity": "_OreEmissionColor",             "slot": "ore_emission_color",    "kind": "color4" },
-        { "unity": "_Gradient",                     "slot": "gradient",              "kind": "float" },
-        { "unity": "_WorldObjectGradient",          "slot": "world_object_gradient", "kind": "float" },
-        { "unity": "_GRADIENTONOFF",                "slot": "gradient_enable",       "kind": "float" },
-        { "unity": "_DETAILTEXTUREONOFF",           "slot": "detail_enable",         "kind": "float" },
-        { "unity": "_DetailTextureTiling",          "slot": "detail_tiling",         "kind": "float" },
-        { "unity": "_TOPPROJECTIONONOFF",           "slot": "topproj_enable",        "kind": "float" },
-        { "unity": "_TopProjectionTextureTiling",   "slot": "topproj_tiling",        "kind": "float" },
-        { "unity": "_TopProjectionTextureCoverage", "slot": "topproj_coverage",      "kind": "float" },
-        { "unity": "_SNOWONOFF",                    "slot": "snow_enable",           "kind": "float" },
-        { "unity": "_SnowAmount",                   "slot": "snow_amount",           "kind": "float" },
-        { "unity": "_SnowCoverage",                 "slot": "snow_coverage",         "kind": "float" },
-        { "unity": "_SnowFade",                     "slot": "snow_fade",             "kind": "float" },
-        { "unity": "_SnowNoiseOnOff",               "slot": "snow_noise_enable",     "kind": "float" },
-        { "unity": "_SnowNoiseScale",               "slot": "snow_noise_scale",      "kind": "float" },
-        { "unity": "_SnowNoiseContrast",            "slot": "snow_noise_contrast",   "kind": "float" },
-        { "unity": "_OREEMISSIONONOFF",             "slot": "ore_emission_enable",   "kind": "float" },
-        { "unity": "_OreEmissionIntensity",         "slot": "ore_emission_intensity","kind": "float" },
-        { "unity": "_ANIMATEOREEMISSIONONOFF",      "slot": "animate_ore",           "kind": "float" },
-        { "unity": "_Smoothness",                   "slot": "smoothness",            "kind": "float" },
-        { "unity": "_DecalsTexture",                "slot": "decals_tex",            "kind": "texture" },
-        { "unity": "_DecalsColor",                  "slot": "decals_color",          "kind": "color4" },
-        { "unity": "_DecakEmissionColor",           "slot": "decal_emission_color",  "kind": "color4" },
-        { "unity": "_DECALSONOFF",                  "slot": "decals_enable",         "kind": "float" },
-        { "unity": "_DECALEMISSIONONOFF",           "slot": "decal_emission_enable", "kind": "float" },
-        { "unity": "_DecalEmissionIntensity",       "slot": "decal_emission_intensity","kind": "float" },
-        { "unity": "_ANIMATEDECALEMISSIONONOFF",    "slot": "animate_decal",         "kind": "float" }
+        {
+          "unity": "_BaseTexture",
+          "slot": "albedo",
+          "kind": "texture"
+        },
+        {
+          "unity": "_DetailTexture",
+          "slot": "detail_tex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_TopProjectionTexture",
+          "slot": "top_tex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_TopColor",
+          "slot": "top_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_GroundColor",
+          "slot": "ground_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_OreColor",
+          "slot": "ore_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_OreEmissionColor",
+          "slot": "ore_emission_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Gradient",
+          "slot": "gradient",
+          "kind": "float"
+        },
+        {
+          "unity": "_WorldObjectGradient",
+          "slot": "world_object_gradient",
+          "kind": "float"
+        },
+        {
+          "unity": "_GRADIENTONOFF",
+          "slot": "gradient_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_DETAILTEXTUREONOFF",
+          "slot": "detail_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_DetailTextureTiling",
+          "slot": "detail_tiling",
+          "kind": "float"
+        },
+        {
+          "unity": "_TOPPROJECTIONONOFF",
+          "slot": "topproj_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_TopProjectionTextureTiling",
+          "slot": "topproj_tiling",
+          "kind": "float"
+        },
+        {
+          "unity": "_TopProjectionTextureCoverage",
+          "slot": "topproj_coverage",
+          "kind": "float"
+        },
+        {
+          "unity": "_SNOWONOFF",
+          "slot": "snow_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowAmount",
+          "slot": "snow_amount",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowCoverage",
+          "slot": "snow_coverage",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowFade",
+          "slot": "snow_fade",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowNoiseOnOff",
+          "slot": "snow_noise_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowNoiseScale",
+          "slot": "snow_noise_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_SnowNoiseContrast",
+          "slot": "snow_noise_contrast",
+          "kind": "float"
+        },
+        {
+          "unity": "_OREEMISSIONONOFF",
+          "slot": "ore_emission_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_OreEmissionIntensity",
+          "slot": "ore_emission_intensity",
+          "kind": "float"
+        },
+        {
+          "unity": "_ANIMATEOREEMISSIONONOFF",
+          "slot": "animate_ore",
+          "kind": "float"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_DecalsTexture",
+          "slot": "decals_tex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_DecalsColor",
+          "slot": "decals_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_DecakEmissionColor",
+          "slot": "decal_emission_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_DECALSONOFF",
+          "slot": "decals_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_DECALEMISSIONONOFF",
+          "slot": "decal_emission_enable",
+          "kind": "float"
+        },
+        {
+          "unity": "_DecalEmissionIntensity",
+          "slot": "decal_emission_intensity",
+          "kind": "float"
+        },
+        {
+          "unity": "_ANIMATEDECALEMISSIONONOFF",
+          "slot": "animate_decal",
+          "kind": "float"
+        }
       ]
     },
     {
@@ -344,22 +1192,86 @@
       "customShader": true,
       "isTransparent": true,
       "properties": [
-        { "unity": "_NormalMapTexture",     "slot": "normal_tex",       "kind": "texture_normal" },
-        { "unity": "_DeepColor",            "slot": "deep_color",       "kind": "color4" },
-        { "unity": "_ShallowColor",         "slot": "shallow_color",    "kind": "color4" },
-        { "unity": "_FoamColor",            "slot": "foam_color",       "kind": "color4" },
-        { "unity": "_Depth",                "slot": "depth",            "kind": "float" },
-        { "unity": "_DepthStrength",        "slot": "depth_strength",   "kind": "float" },
-        { "unity": "_Smootness",            "slot": "smoothness",       "kind": "float" },
-        { "unity": "_Mettalic",             "slot": "metallic",         "kind": "float" },
-        { "unity": "_WaveAmplitude",        "slot": "wave_amplitude",   "kind": "float" },
-        { "unity": "_WaveSpeed",            "slot": "wave_speed",       "kind": "float" },
-        { "unity": "_WaveTile",             "slot": "wave_tile",        "kind": "float" },
-        { "unity": "_NormalMapWavesSpeed",  "slot": "normal_speed",     "kind": "float" },
-        { "unity": "_NormalMapsWavesSize",  "slot": "normal_size",      "kind": "float" },
-        { "unity": "_FoamAmount",           "slot": "foam_amount",      "kind": "float" },
-        { "unity": "_FoamPower",            "slot": "foam_power",       "kind": "float" },
-        { "unity": "_FoamNoiseScale",       "slot": "foam_noise_scale", "kind": "float" }
+        {
+          "unity": "_NormalMapTexture",
+          "slot": "normal_tex",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_DeepColor",
+          "slot": "deep_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_ShallowColor",
+          "slot": "shallow_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_FoamColor",
+          "slot": "foam_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Depth",
+          "slot": "depth",
+          "kind": "float"
+        },
+        {
+          "unity": "_DepthStrength",
+          "slot": "depth_strength",
+          "kind": "float"
+        },
+        {
+          "unity": "_Smootness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Mettalic",
+          "slot": "metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_WaveAmplitude",
+          "slot": "wave_amplitude",
+          "kind": "float"
+        },
+        {
+          "unity": "_WaveSpeed",
+          "slot": "wave_speed",
+          "kind": "float"
+        },
+        {
+          "unity": "_WaveTile",
+          "slot": "wave_tile",
+          "kind": "float"
+        },
+        {
+          "unity": "_NormalMapWavesSpeed",
+          "slot": "normal_speed",
+          "kind": "float"
+        },
+        {
+          "unity": "_NormalMapsWavesSize",
+          "slot": "normal_size",
+          "kind": "float"
+        },
+        {
+          "unity": "_FoamAmount",
+          "slot": "foam_amount",
+          "kind": "float"
+        },
+        {
+          "unity": "_FoamPower",
+          "slot": "foam_power",
+          "kind": "float"
+        },
+        {
+          "unity": "_FoamNoiseScale",
+          "slot": "foam_noise_scale",
+          "kind": "float"
+        }
       ]
     },
     {
@@ -368,34 +1280,146 @@
       "engineSkinnedShader": "/shaders/polytope/pt_buildings.hz.glsl",
       "customShader": true,
       "properties": [
-        { "unity": "_TextureSample2",       "slot": "base_tex",             "kind": "texture" },
-        { "unity": "_TextureSample9",       "slot": "mask_tex",             "kind": "texture" },
-        { "unity": "_Interiorwallscolor",   "slot": "interior_walls_color", "kind": "color4" },
-        { "unity": "_Mortarcolor",          "slot": "mortar_color",         "kind": "color4" },
-        { "unity": "_Rock1color",           "slot": "rock1_color",          "kind": "color4" },
-        { "unity": "_Rock2color",           "slot": "rock2_color",          "kind": "color4" },
-        { "unity": "_Fabric1color",         "slot": "fabric1_color",        "kind": "color4" },
-        { "unity": "_Fabric2color",         "slot": "fabric2_color",        "kind": "color4" },
-        { "unity": "_Fabric3color",         "slot": "fabric3_color",        "kind": "color4" },
-        { "unity": "_Exteriorwalls1colour", "slot": "ext_walls1_color",     "kind": "color4" },
-        { "unity": "_Exteriorwalls2color",  "slot": "ext_walls2_color",     "kind": "color4" },
-        { "unity": "_Exteriorwalls3color",  "slot": "ext_walls3_color",     "kind": "color4" },
-        { "unity": "_Wood1color",           "slot": "wood1_color",          "kind": "color4" },
-        { "unity": "_Wood2color",           "slot": "wood2_color",          "kind": "color4" },
-        { "unity": "_Wood3color",           "slot": "wood3_color",          "kind": "color4" },
-        { "unity": "_Ceramictiles1color",   "slot": "ceramic1_color",       "kind": "color4" },
-        { "unity": "_Ceramictiles2color",   "slot": "ceramic2_color",       "kind": "color4" },
-        { "unity": "_Ceramictiles3color",   "slot": "ceramic3_color",       "kind": "color4" },
-        { "unity": "_Ropecolor",            "slot": "rope_color",           "kind": "color4" },
-        { "unity": "_Haycolor",             "slot": "hay_color",            "kind": "color4" },
-        { "unity": "_Metal1color",          "slot": "metal1_color",         "kind": "color4" },
-        { "unity": "_Metal2color",          "slot": "metal2_color",         "kind": "color4" },
-        { "unity": "_Metal3color",          "slot": "metal3_color",         "kind": "color4" },
-        { "unity": "_MetallicOn",           "slot": "metallic_on",          "kind": "float" },
-        { "unity": "_SmoothnessOn",         "slot": "smoothness_on",        "kind": "float" },
-        { "unity": "_Metal1metallic",       "slot": "metal_metallic",       "kind": "float" },
-        { "unity": "_Metal1smootness",      "slot": "metal_smoothness",     "kind": "float" },
-        { "unity": "_Ceramic1smoothness",   "slot": "ceramic_smoothness",   "kind": "float" }
+        {
+          "unity": "_TextureSample2",
+          "slot": "base_tex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_TextureSample9",
+          "slot": "mask_tex",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Interiorwallscolor",
+          "slot": "interior_walls_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Mortarcolor",
+          "slot": "mortar_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Rock1color",
+          "slot": "rock1_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Rock2color",
+          "slot": "rock2_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Fabric1color",
+          "slot": "fabric1_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Fabric2color",
+          "slot": "fabric2_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Fabric3color",
+          "slot": "fabric3_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Exteriorwalls1colour",
+          "slot": "ext_walls1_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Exteriorwalls2color",
+          "slot": "ext_walls2_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Exteriorwalls3color",
+          "slot": "ext_walls3_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Wood1color",
+          "slot": "wood1_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Wood2color",
+          "slot": "wood2_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Wood3color",
+          "slot": "wood3_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Ceramictiles1color",
+          "slot": "ceramic1_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Ceramictiles2color",
+          "slot": "ceramic2_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Ceramictiles3color",
+          "slot": "ceramic3_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Ropecolor",
+          "slot": "rope_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Haycolor",
+          "slot": "hay_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Metal1color",
+          "slot": "metal1_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Metal2color",
+          "slot": "metal2_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Metal3color",
+          "slot": "metal3_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_MetallicOn",
+          "slot": "metallic_on",
+          "kind": "float"
+        },
+        {
+          "unity": "_SmoothnessOn",
+          "slot": "smoothness_on",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metal1metallic",
+          "slot": "metal_metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metal1smootness",
+          "slot": "metal_smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Ceramic1smoothness",
+          "slot": "ceramic_smoothness",
+          "kind": "float"
+        }
       ]
     },
     {
@@ -655,6 +1679,230 @@
           "kind": "float"
         }
       ]
+    },
+    {
+      "unityShader": "Shader Graphs/HologramSigns",
+      "engineShader": "/shaders/unity/hologram_signs.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/hologram_signs.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/IlluminatedSignsArray",
+      "engineShader": "/shaders/unity/illuminated_signs_array.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/illuminated_signs_array.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/BacklitSign",
+      "engineShader": "/shaders/unity/backlit_sign.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/backlit_sign.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingFlatColor",
+      "engineShader": "/shaders/unity/custom_lighting_flat_color.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_flat_color.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingBuildingsB_LOD",
+      "engineShader": "/shaders/unity/custom_lighting_buildings_b_lod.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_buildings_b_lod.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/IlluminatedSigns",
+      "engineShader": "/shaders/unity/illuminated_signs.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/illuminated_signs.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingBuildingsB_NoLights",
+      "engineShader": "/shaders/unity/custom_lighting_buildings_b_no_lights.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_buildings_b_no_lights.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingBuildingsB",
+      "engineShader": "/shaders/unity/custom_lighting_buildings_b.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_buildings_b.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingIridescence",
+      "engineShader": "/shaders/unity/custom_lighting_iridescence.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_iridescence.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingBuildingsB_NoLights_LOD",
+      "engineShader": "/shaders/unity/custom_lighting_buildings_b_no_lights_lod.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_buildings_b_no_lights_lod.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingLit",
+      "engineShader": "/shaders/unity/custom_lighting_lit.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_lit.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingMaster",
+      "engineShader": "/shaders/unity/custom_lighting_master.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_master.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingBuildings",
+      "engineShader": "/shaders/unity/custom_lighting_buildings.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_buildings.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingGlow",
+      "engineShader": "/shaders/unity/custom_lighting_glow.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_glow.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/Blinkie",
+      "engineShader": "/shaders/unity/blinkie.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/blinkie.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/FogPlane",
+      "engineShader": "/shaders/unity/fog_plane.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/fog_plane.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/ZeppelinTail",
+      "engineShader": "/shaders/unity/zeppelin_tail.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/zeppelin_tail.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/AnimatedLogo1",
+      "engineShader": "/shaders/unity/animated_logo_1.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/animated_logo_1.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/Perisphere_surrounds_plinth",
+      "engineShader": "/shaders/unity/perisphere_surrounds_plinth.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/perisphere_surrounds_plinth.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/trylon_skin",
+      "engineShader": "/shaders/unity/trylon_skin.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/trylon_skin.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/pylons",
+      "engineShader": "/shaders/unity/pylons.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/pylons.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingIridescence_Glow",
+      "engineShader": "/shaders/unity/custom_lighting_iridescence_glow.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_iridescence_glow.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/Perisphere_surrounds",
+      "engineShader": "/shaders/unity/perisphere_surrounds.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/perisphere_surrounds.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/IlluminatedSignsAnimatedArray",
+      "engineShader": "/shaders/unity/illuminated_signs_animated_array.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/illuminated_signs_animated_array.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/Storefronts_Light",
+      "engineShader": "/shaders/unity/storefronts_light.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/storefronts_light.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/SG_Airduct",
+      "engineShader": "/shaders/unity/sg_airduct.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/sg_airduct.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/Storefronts",
+      "engineShader": "/shaders/unity/storefronts.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/storefronts.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/HologramProjector",
+      "engineShader": "/shaders/unity/hologram_projector.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/hologram_projector.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingWindmill",
+      "engineShader": "/shaders/unity/custom_lighting_windmill.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_windmill.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/CustomLightingFloatingSIgn",
+      "engineShader": "/shaders/unity/custom_lighting_floating_s_ign.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/custom_lighting_floating_s_ign.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/Searchlight",
+      "engineShader": "/shaders/unity/searchlight.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/searchlight.hz.glsl",
+      "customShader": true,
+      "properties": []
+    },
+    {
+      "unityShader": "Shader Graphs/Windows",
+      "engineShader": "/shaders/unity/windows.hz.glsl",
+      "engineSkinnedShader": "/shaders/unity/windows.hz.glsl",
+      "customShader": true,
+      "properties": []
     }
   ],
   "customFunctions": [
@@ -662,7 +1910,117 @@
       "name": "MainLight",
       "engineCall": "hz_main_light",
       "structType": "HzMainLight",
-      "structFields": ["direction", "color", "distance_atten", "shadow_atten"]
+      "structFields": [
+        "direction",
+        "color",
+        "distance_atten",
+        "shadow_atten"
+      ]
+    },
+    {
+      "name": "AddAdditionalLights",
+      "engineCall": "hz_additional_lights",
+      "structType": "HzAdditionalLights",
+      "structFields": [
+        "diffuse",
+        "specular",
+        "color"
+      ],
+      "glsl": [
+        "struct HzAdditionalLights {",
+        "    float diffuse;",
+        "    vec3  specular;",
+        "    vec3  color;",
+        "};",
+        "",
+        "HzAdditionalLights hz_additional_lights(float smoothness, vec3 world_pos, vec3 world_normal, vec3 world_view, float main_diffuse, vec3 main_specular, vec3 main_color) {",
+        "    HzAdditionalLights r;",
+        "    r.diffuse  = main_diffuse;",
+        "    r.specular = main_specular;",
+        "    r.color    = main_color * (vec3(main_diffuse) + main_specular);",
+        "#ifdef HZ_RENDERER_LIGHTING_CLUSTERS",
+        "    // the cluster loop is keyed on view depth; derive it here so this works in templates without v_view_depth",
+        "    float hz_al_view_z = -(hz_scene.view * vec4(world_pos, 1.0)).z;",
+        "    HZ_CLUSTER_LOOP_BEGIN(hz_al_view_z)",
+        "        vec3 hz_al_to = light.position - world_pos;",
+        "        float hz_al_d2 = dot(hz_al_to, hz_al_to);",
+        "        if (hz_al_d2 < light.radius * light.radius) {",
+        "            vec3 hz_al_l = hz_al_to * inversesqrt(max(hz_al_d2, 6.103515625e-5));",
+        "            float hz_al_diff = clamp(dot(world_normal, hz_al_l), 0.0, 1.0) * point_light_attenuation(hz_al_d2, light.radius);",
+        "            r.diffuse += hz_al_diff;",
+        "            r.color   += light.color * light.intensity * hz_al_diff;",
+        "        }",
+        "    HZ_CLUSTER_LOOP_END",
+        "#endif",
+        "    return r;",
+        "}"
+      ]
+    },
+    {
+      "name": "DistantShadows",
+      "engineCall": "hz_distant_shadows",
+      "structType": "HzDistantShadows",
+      "structFields": [
+        "shadow_matrix",
+        "shadow_matrix_inverse",
+        "shadow_texture",
+        "shadow_fade_distance",
+        "shadow_active",
+        "shadow_bias_desktop",
+        "shadow_bias_mobile"
+      ],
+      "glsl": [
+        "struct HzDistantShadows {",
+        "    mat4  shadow_matrix;",
+        "    mat4  shadow_matrix_inverse;",
+        "    uint  shadow_texture;",
+        "    float shadow_fade_distance;",
+        "    float shadow_active;",
+        "    float shadow_bias_desktop;",
+        "    float shadow_bias_mobile;",
+        "};",
+        "",
+        "HzDistantShadows hz_distant_shadows() {",
+        "    HzDistantShadows r;",
+        "    r.shadow_matrix         = mat4(1.0);",
+        "    r.shadow_matrix_inverse = mat4(1.0);",
+        "    r.shadow_texture        = 0u;",
+        "    r.shadow_fade_distance  = 0.0;",
+        "    r.shadow_active         = 0.0;",
+        "    r.shadow_bias_desktop   = 0.0;",
+        "    r.shadow_bias_mobile    = 0.0;",
+        "    return r;",
+        "}"
+      ],
+      "whiteTextureFields": [
+        "shadow_texture"
+      ]
+    },
+    {
+      "name": "isAndroid",
+      "engineCall": "hz_is_android",
+      "structType": "HzIsAndroid",
+      "structFields": [
+        "result"
+      ],
+      "glsl": [
+        "struct HzIsAndroid { bool result; };",
+        "",
+        "HzIsAndroid hz_is_android() { HzIsAndroid r; r.result = false; return r; }"
+      ]
+    },
+    {
+      "name": "MainLightShadowFade",
+      "engineCall": "hz_main_light_shadow_fade",
+      "structType": "HzMainLightShadowFade",
+      "structFields": [
+        "fade"
+      ],
+      "glsl": [
+        "struct HzMainLightShadowFade { float fade; };",
+        "",
+        "HzMainLightShadowFade hz_main_light_shadow_fade(vec3 world_pos) { HzMainLightShadowFade r; r.fade = 0.0; return r; }"
+      ]
     }
   ]
 }

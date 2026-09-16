@@ -227,6 +227,10 @@ namespace HZExporter.ShaderGraph
             if (fsScan.Contains("hz_scene_color"))        fsDefines.AppendLine("#define HZ_RENDERER_SCENE_COLOR");
             if (fsScan.Contains("hz_scene_depth_linear")) fsDefines.AppendLine("#define HZ_RENDERER_SCENE_DEPTH");
 
+            // The unlit template carries the world-position varying only when the graph reads it
+            // (ViewVectorNode / PositionNode in @fs); a vec3 varying on every unlit shader is not free.
+            bool needsWorldPos = fsScan.Contains("v_world_pos") || vsBodyStr.Contains("v_world_pos");
+
             // Lit graphs that leave Base Color unwired are "implicit unlit" (their
             // output is driven through Emission). Skip the PBR lighting block and
             // start from black — the tail (emission/fog) carries it.
@@ -247,6 +251,9 @@ namespace HZExporter.ShaderGraph
                 .Replace("${VS_MAT_UNPACK}",  vsMatUnpack)
                 .Replace("${VS_HELPERS}",   vsHelpers.ToString())
                 .Replace("${HELPERS}",      fsHelpers.ToString())
+                .Replace("${VS_WORLD_POS_OUT}",    needsWorldPos ? "out vec3 v_world_pos;\n" : "")
+                .Replace("${VS_WORLD_POS_ASSIGN}", needsWorldPos ? "    v_world_pos = world_pos.xyz;\n" : "")
+                .Replace("${FS_WORLD_POS_IN}",     needsWorldPos ? "in vec3 v_world_pos;\n" : "")
                 .Replace("${FS_FEATURE_DEFINES}", fsDefines.ToString())
                 .Replace("${FUNCTIONS}", functions.ToString())
                 .Replace("${VERTEX_BODY}", vsBodyStr)
@@ -564,6 +571,12 @@ namespace HZExporter.ShaderGraph
                 if (to == SgType.Vec2 || to == SgType.Vec3 || to == SgType.Vec4)
                     return Sg.Call(SgTypes.Glsl(to), r);
             }
+            // Unity silently reads a bool as 0/1; GLSL needs the explicit constructor.
+            if (from == SgType.Bool)
+            {
+                var asFloat = Sg.Call("float", r);
+                return to == SgType.Float ? asFloat : CoerceRhs(asFloat, SgType.Float, to);
+            }
             // vec_n → smaller via swizzle, → larger via constructor with 0 padding.
             int rf = SgTypes.Rank(from), rt = SgTypes.Rank(to);
             if (rf > 0 && rt > 0)
@@ -628,7 +641,7 @@ out vec2 v_uv1;
 out vec4 v_color;
 flat out uint v_material_offset;
 out vec3 v_normal;
-#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_OUT}#ifdef HZ_RENDERER_GBUFFER
 out vec4 v_clip_cur;
 out vec4 v_clip_prev;
 #endif
@@ -643,7 +656,7 @@ ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0
     v_color = v.color;
     v_material_offset = v.material_offset;
     v_normal = normalize((v.model * vec4(${VS_NORMAL}, 0.0)).xyz);
-#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
     // jitter-free motion vectors through the previous model; time-driven vertex motion stays camera-only
     v_clip_cur = hz_scene.view_proj_unjittered * world_pos;
     v_clip_prev = hz_scene.prev_view_proj * (unpack_prev_model() * vec4(${VS_POS}, 1.0));
@@ -658,7 +671,7 @@ in vec2 v_uv1;
 in vec4 v_color;
 flat in uint v_material_offset;
 in vec3 v_normal;
-layout(location = 0) out vec4 frag_color;
+${FS_WORLD_POS_IN}layout(location = 0) out vec4 frag_color;
 ${GBUFFER_FS_OUTPUTS}
 ${MATERIAL_STRUCT}
 ${HELPERS}${FUNCTIONS}void main() {

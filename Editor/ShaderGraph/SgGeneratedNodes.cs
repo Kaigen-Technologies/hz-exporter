@@ -71,7 +71,7 @@ namespace HZExporter.ShaderGraph
             Pattern("ReflectionNode", v => Sg.Call("reflect", v[0].Rhs, v[1].Rhs), PromoteAB, "In", "Normal");
             Pattern("ReflectionProbeNode", v => Sg.Call("SHADERGRAPH_REFLECTION_PROBE", v[0].Rhs, v[1].Rhs, v[2].Rhs), _ => SgType.Vec3, "ViewDir", "Normal", "LOD");
             Pattern("RejectionNode", v => Sg.RawTemplate("({0} - ({1} * dot({0}, {1}) / dot({1}, {1})))", v[0].Rhs, v[1].Rhs), PromoteAB, "A", "B");
-            Pattern("RemapNode", v => Sg.RawTemplate("({2}.x + ({0} - {1}.x) * ({2}.y - {2}.x) / ({1}.y - {1}.x))", v[0].Rhs, v[1].Rhs, v[2].Rhs), SameAsIn, "In", "InMinMax", "OutMinMax");
+            Pattern("RemapNode", v => Sg.RawTemplate("({2}.x + ({0} - {1}.x) * ({2}.y - {2}.x) / ({1}.y - {1}.x))", v[0].Rhs, v[1].Rhs, v[2].Rhs), SameAsIn, "In|A", "InMinMax", "OutMinMax");
             Pattern("RoundNode", v => Sg.Call("round", v[0].Rhs), SameAsIn, "In");
             Pattern("SaturateNode", v => Sg.Call("clamp", v[0].Rhs, Sg.Lit(0.0), Sg.Lit(1.0)), SameAsIn, "In");
             Pattern("SceneColorNode", v => Sg.RawTemplate("(SHADERGRAPH_SAMPLE_SCENE_COLOR({0}.xy))", v[0].Rhs), _ => SgType.Vec3, "UV");

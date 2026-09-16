@@ -118,6 +118,14 @@ namespace HZExporter.ShaderGraph
             return v;
         }
 
+        // Pattern input names may list version aliases as "In|A" — first match wins.
+        public SgValue InputByAnyName(SgNode node, string slotNames)
+        {
+            foreach (var n in slotNames.Split('|'))
+                if (node.SlotByName.TryGetValue(n, out int num)) return Input(node.Id, num);
+            throw new Exception($"node '{node.Type}' has no input slot named '{slotNames}'");
+        }
+
         public SgValue InputByName(SgNode node, string slotName)
         {
             if (!node.SlotByName.TryGetValue(slotName, out int num))
@@ -256,7 +264,8 @@ namespace HZExporter.ShaderGraph
                 }
             }
             // Unwired space slots read IN.<Space>Space<Kind> in Unity and ignore m_Value (NormalMaterialSlot.GetDefaultValue)
-            if (slot.Type == "NormalMaterialSlot" || slot.Type == "TangentMaterialSlot" || slot.Type == "PositionMaterialSlot")
+            if (slot.Type == "NormalMaterialSlot" || slot.Type == "TangentMaterialSlot" || slot.Type == "PositionMaterialSlot"
+                || slot.Type == "ViewDirectionMaterialSlot")
                 return SpaceSlotDefault(slot, isVertexStage);
             if (t == SgType.Unknown)
             {
@@ -296,6 +305,12 @@ namespace HZExporter.ShaderGraph
                 case "PositionMaterialSlot":
                     if (world) expr = isVertexStage ? "(v.model * vec4(v.pos, 1.0)).xyz" : "v_world_pos";
                     else if (space == 0) expr = isVertexStage ? "v.pos" : "v_object_pos";
+                    break;
+                case "ViewDirectionMaterialSlot":
+                    if (world)
+                        expr = isVertexStage
+                            ? "normalize(hz_scene.camera_pos - (v.model * vec4(v.pos, 1.0)).xyz)"
+                            : "normalize(hz_scene.camera_pos - v_world_pos)";
                     break;
             }
             if (expr == null)
@@ -417,7 +432,7 @@ namespace HZExporter.ShaderGraph
         {
             var values = new SgValue[InputNames.Length];
             for (int i = 0; i < InputNames.Length; i++)
-                values[i] = ctx.InputByName(node, InputNames[i]);
+                values[i] = ctx.InputByAnyName(node, InputNames[i]);
 
             var tArr = new SgType[values.Length];
             for (int i = 0; i < values.Length; i++) tArr[i] = values[i].Type;
@@ -750,6 +765,109 @@ namespace HZExporter.ShaderGraph
 
     // MainLightDirectionNode: the engine's primary directional light, points
     // FROM the light. Unity's convention is the same.
+    // ViewVectorNode: surface-to-camera, UNNORMALIZED (ViewDirectionNode is the normalized one).
+    // Object/View/Tangent need matrices the engine has no uniform for.
+    class ViewVectorNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            int space = 0;
+            if (node.Raw.TryGetValue("m_Space", out var s) && s is double d) space = (int)d;
+            // AbsoluteWorld matches World without camera-relative rendering, which is the engine's setup
+            if (space != 2 && space != 4)
+                throw new System.NotImplementedException($"ViewVectorNode space {space} not supported (engine has no uniform for it)");
+            string pos = ctx.IsVertexStage ? "(v.model * vec4(v.pos, 1.0)).xyz" : "v_world_pos";
+            return new SgValue { Rhs = Sg.Raw($"(hz_scene.camera_pos - {pos})"), Type = SgType.Vec3, IsTemp = false };
+        }
+    }
+
+    // BranchOnInputConnectionNode: which side is taken is fixed at translation time by whether
+    // the Input port is wired, so only the taken branch is lowered. Subgraphs inline as functions
+    // whose parameters are always passed, so the wired side is what a supplied value maps to.
+    class BranchOnInputConnectionNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            bool connected = ctx.Graph.FindEdgeIntoSlot(node.Id, 0) != null;
+            return ctx.Input(node.Id, connected ? 1 : 2);
+        }
+    }
+
+    // SwizzleNode: convertedMask is already GLSL component order ("xz", "xyzw", ...).
+    class SwizzleNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            string mask = node.Raw.TryGetValue("convertedMask", out var m) ? m as string : null;
+            if (string.IsNullOrEmpty(mask))
+                throw new System.NotImplementedException("SwizzleNode has no convertedMask");
+            var v = ctx.Input(node.Id, 0);
+            SgType t;
+            switch (mask.Length)
+            {
+                case 1:  t = SgType.Float; break;
+                case 2:  t = SgType.Vec2;  break;
+                case 3:  t = SgType.Vec3;  break;
+                default: t = SgType.Vec4;  break;
+            }
+            return ctx.EmitTemp(t, Sg.Swizzle(v.Rhs, mask));
+        }
+    }
+
+    // MatrixSplitNode: m_Axis 0 = row, 1 = column. GLSL is column-major, so m[i] IS column i.
+    class MatrixSplitNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            int axis = 1;
+            if (node.Raw.TryGetValue("m_Axis", out var a) && a is double d) axis = (int)d;
+            int i = outSlotNum - 1;
+            if (i < 0 || i > 3)
+                throw new System.Exception($"MatrixSplitNode: invalid output slot {outSlotNum}");
+            var m = ctx.Input(node.Id, 0);
+            var rhs = axis == 1
+                ? Sg.RawTemplate("{0}[" + i + "]", m.Rhs)
+                : Sg.RawTemplate($"vec4({{0}}[0][{i}], {{0}}[1][{i}], {{0}}[2][{i}], {{0}}[3][{i}])", m.Rhs);
+            return ctx.EmitTemp(SgType.Vec4, rhs);
+        }
+    }
+
+    // ViewDirectionNode: the normalized form of ViewVectorNode.
+    class ViewDirectionNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            int space = 0;
+            if (node.Raw.TryGetValue("m_Space", out var s) && s is double d) space = (int)d;
+            if (space != 2 && space != 4)
+                throw new System.NotImplementedException($"ViewDirectionNode space {space} not supported (engine has no uniform for it)");
+            string pos = ctx.IsVertexStage ? "(v.model * vec4(v.pos, 1.0)).xyz" : "v_world_pos";
+            return new SgValue { Rhs = Sg.Raw($"normalize(hz_scene.camera_pos - {pos})"), Type = SgType.Vec3, IsTemp = false };
+        }
+    }
+
+    // ConstantNode: Unity's ConstantType enum order is PI, TAU, PHI, E, SQRT2.
+    class ConstantNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            int which = 0;
+            if (node.Raw.TryGetValue("m_constant", out var c) && c is double d) which = (int)d;
+            else if (node.Raw.TryGetValue("m_Constant", out var c2) && c2 is double d2) which = (int)d2;
+            double v;
+            switch (which)
+            {
+                case 0: v = 3.1415926535897931; break;
+                case 1: v = 6.2831853071795862; break;
+                case 2: v = 1.6180339887498949; break;
+                case 3: v = 2.7182818284590451; break;
+                case 4: v = 1.4142135623730951; break;
+                default: throw new System.NotImplementedException($"ConstantNode constant {which} not supported");
+            }
+            return SgValue.Inline(Sg.LitConst(SgConst.Scalar(v)), SgType.Float);
+        }
+    }
+
     // CameraNode: engine camera is always perspective, reverse-Z; width/height/direction have no uniform.
     class CameraNodeHandler : NodeHandler
     {
@@ -1340,6 +1458,8 @@ namespace HZExporter.ShaderGraph
         SgValue EmitSample(SgNode node, LowerCtx ctx)
         {
             var texInput = ctx.Input(node.Id, 1);
+            if (texInput.Rhs is SgRhsRaw raw && raw.Glsl == CustomFunctionNodeHandler.WhiteTextureSentinel)
+                return ctx.EmitTemp(SgType.Vec4, Sg.Raw("vec4(1.0)"));
             if (!(texInput.Rhs is SgRhsTextureRef texRef))
                 throw new System.NotImplementedException(
                     "SampleTexture2D: Texture input must come from a Texture2D PropertyNode");
@@ -1523,6 +1643,10 @@ float _hz_gradient_noise(vec2 uv, float scale) {
                 throw new NotImplementedException(
                     $"CustomFunctionNode '{fnName}' has no entry in shader_mapping.json `customFunctions` — add an `engineCall`/`structType`/`structFields` mapping or the function name will go through as-is is not supported");
 
+            // Functions the engine does not provide carry their own GLSL; the set dedupes it.
+            if (map.glsl != null && map.glsl.Count > 0)
+                ctx.HelperFunctions.Add((map.engineCall, string.Join("\n", map.glsl)));
+
             // Lookup or emit the call site once for this node.
             if (!ctx.CustomFunctionTemps.TryGetValue(node.Id, out var temp))
             {
@@ -1555,6 +1679,9 @@ float _hz_gradient_noise(vec2 uv, float scale) {
                 throw new Exception(
                     $"CustomFunctionNode '{fnName}': slot '{outSlot.OutputName}' (-> '{fieldName}') not in mapping.structFields=[{string.Join(",", map.structFields)}]");
 
+            if (map.whiteTextureFields != null && map.whiteTextureFields.Contains(fieldName))
+                return new SgValue { Rhs = Sg.Raw(WhiteTextureSentinel), Type = SgType.Texture2D, IsTemp = false };
+
             return new SgValue
             {
                 Rhs = Sg.Swizzle(temp.Rhs, fieldName),
@@ -1562,6 +1689,8 @@ float _hz_gradient_noise(vec2 uv, float scale) {
                 IsTemp = false,
             };
         }
+
+        public const string WhiteTextureSentinel = "HZ_SG_WHITE_TEXTURE";
     }
 
     // ===== registry ===========================================================
@@ -1625,6 +1754,12 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             _handlers["NormalVectorNode"]        = new NormalVectorNodeHandler();
             _handlers["MainLightDirectionNode"]  = new MainLightDirectionNodeHandler();
             _handlers["CameraNode"]              = new CameraNodeHandler();
+            _handlers["ViewVectorNode"]          = new ViewVectorNodeHandler();
+            _handlers["BranchOnInputConnectionNode"] = new BranchOnInputConnectionNodeHandler();
+            _handlers["SwizzleNode"]             = new SwizzleNodeHandler();
+            _handlers["MatrixSplitNode"]         = new MatrixSplitNodeHandler();
+            _handlers["ViewDirectionNode"]       = new ViewDirectionNodeHandler();
+            _handlers["ConstantNode"]            = new ConstantNodeHandler();
             _handlers["GradientNode"]            = new GradientNodeHandler();
             _handlers["SampleGradient"]          = new SampleGradientHandler();
             _handlers["RedirectNodeData"]        = new RedirectNodeDataHandler();

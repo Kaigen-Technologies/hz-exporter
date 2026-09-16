@@ -87,6 +87,12 @@ namespace HZExporter
             public string engineCall;      // GLSL function the engine provides
             public string structType;      // GLSL struct returned by engineCall
             public List<string> structFields;  // snake_case field names
+            // Optional GLSL definition emitted into the generated shader, for functions the
+            // engine does not provide. Lines are joined with newlines (JSON has no block strings).
+            public List<string> glsl;
+            // Texture-typed output fields with no engine texture behind them; sampling one
+            // yields the default white texture instead of a binding.
+            public List<string> whiteTextureFields;
         }
 
         [System.Serializable]

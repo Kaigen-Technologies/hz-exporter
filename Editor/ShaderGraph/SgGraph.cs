@@ -221,6 +221,7 @@ namespace HZExporter.ShaderGraph
                 case "NormalMaterialSlot":
                 case "TangentMaterialSlot":
                 case "ColorRGBMaterialSlot":
+                case "ViewDirectionMaterialSlot":
                     return SgType.Vec3;
                 case "Vector4MaterialSlot":
                 case "ColorRGBAMaterialSlot":
@@ -234,6 +235,9 @@ namespace HZExporter.ShaderGraph
                     return SgType.Texture2D;
                 case "SamplerStateMaterialSlot":
                     return SgType.SamplerState;
+                case "Matrix4MaterialSlot":
+                case "DynamicMatrixMaterialSlot":
+                    return SgType.Mat4;
             }
             return SgType.Unknown;
         }

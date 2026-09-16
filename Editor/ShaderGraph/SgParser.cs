@@ -281,7 +281,13 @@ namespace HZExporter.ShaderGraph
                         if (!g.Slots.TryGetValue(sid, out var slot)) continue;
                         node.SlotByNum[slot.NumId] = sid;
                         if (!string.IsNullOrEmpty(slot.DisplayName))
+                        {
                             node.SlotByName[slot.DisplayName] = slot.NumId;
+                            // ShaderGraph versions disagree on spacing ("In Min Max" vs "InMinMax"); index both
+                            string compact = slot.DisplayName.Replace(" ", "");
+                            if (compact != slot.DisplayName && !node.SlotByName.ContainsKey(compact))
+                                node.SlotByName[compact] = slot.NumId;
+                        }
                     }
                 }
                 g.Nodes[node.Id] = node;
