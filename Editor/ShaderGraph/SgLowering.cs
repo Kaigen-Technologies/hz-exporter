@@ -74,6 +74,8 @@ namespace HZExporter.ShaderGraph
         // Set when this body reads a MaterialFS field, so subgraph functions that sample a
         // node-embedded texture take `mat` and the vertex stage knows to unpack it.
         public bool UsesMaterial;
+        // Subgraph properties resolved at the call site instead of passed in, keyed by property id.
+        public Dictionary<string, SgValue> BoundProperties = new Dictionary<string, SgValue>();
 
         public SgValue Output(string nodeId, int outSlotNum)
         {
@@ -580,12 +582,25 @@ namespace HZExporter.ShaderGraph
             var sg = SgSubGraphLoader.Load(guid);
             string fnName = SgSubGraphLoader.FunctionName(guid);
 
+            // A texture cannot be a function parameter: texture_sample's first argument is a
+            // compile-time identifier on the non-bindless path. Resolve texture inputs at the
+            // call site and specialise the function name, so each binding gets its own body.
+            var bound = new Dictionary<string, SgValue>();
+            foreach (var prop in sg.Properties)
+            {
+                if (prop.Type != SgType.Texture2D && prop.Type != SgType.TextureCube) continue;
+                if (prop.IsInlineResource || prop.IsGlobal) continue;
+                var v = ResolveCallArg(node, prop, ctx);
+                bound[prop.Id] = v;
+                if (v.Rhs is SgRhsTextureRef tr) fnName += "_" + tr.FieldName;
+            }
+
             // Reuse an already-emitted function for this subgraph (if some
             // other SubGraphNode instance already created it).
             SgFunctionDef fn = null;
             foreach (var f in ctx.Functions) if (f.Name == fnName) { fn = f; break; }
             if (fn == null)
-                fn = BuildFunction(node, ctx, sg, guid, fnName);
+                fn = BuildFunction(node, ctx, sg, guid, fnName, bound);
 
             // Emit `<retType> _nN = fnName(args…);` — struct-typed for
             // multi-output, primitive-typed for single-output. Args come from
@@ -607,13 +622,16 @@ namespace HZExporter.ShaderGraph
         // SubGraphNode declares them) into an SgFunctionOutput. The function
         // body comes from one shared LowerCtx so outputs share intermediate
         // statements when the optimizer runs over them.
-        SgFunctionDef BuildFunction(SgNode node, LowerCtx ctx, SgGraph sg, string guid, string fnName)
+        SgFunctionDef BuildFunction(SgNode node, LowerCtx ctx, SgGraph sg, string guid, string fnName,
+                                    Dictionary<string, SgValue> bound = null)
         {
             SgNode sgOut = null;
             foreach (var n in sg.Nodes.Values) if (n.Type == "SubGraphOutputNode") { sgOut = n; break; }
             if (sgOut == null) throw new System.Exception($"subgraph {guid} has no SubGraphOutputNode");
 
             var fnCtx = new LowerCtx(sg) { IsVertexStage = ctx.IsVertexStage, IsSubGraph = true, RootGraph = ctx.Root };
+            if (bound != null)
+                foreach (var kv in bound) fnCtx.BoundProperties[kv.Key] = kv.Value;
 
             // Subgraph properties become function parameters. PropertyNode
             // inside the subgraph body will reference them as bare names.
@@ -625,9 +643,10 @@ namespace HZExporter.ShaderGraph
                 // A resource embedded on a node inside the subgraph belongs to the final
                 // shader's MaterialFS; it reaches the body through `mat`, not the call.
                 if (prop.IsInlineResource) { HoistInlineProperty(ctx.Root, prop); continue; }
-                if (prop.Type == SgType.Texture2D)
+                if (fnCtx.BoundProperties.ContainsKey(prop.Id)) continue;   // bound at the call site
+                if (prop.Type == SgType.Texture2D || prop.Type == SgType.TextureCube)
                     throw new System.NotImplementedException(
-                        $"subgraph {guid}: Texture2D properties as subgraph inputs not yet supported");
+                        $"subgraph {guid}: texture property '{prop.ReferenceName}' has no call-site binding");
                 fnParams.Add(new SgFunctionParam { Name = prop.FieldName, Type = prop.Type });
             }
 
@@ -689,6 +708,19 @@ namespace HZExporter.ShaderGraph
             root.Properties.Add(prop);
         }
 
+        // Resolve the value flowing into the SubGraphNode slot that matches one subgraph property.
+        SgValue ResolveCallArg(SgNode node, SgProperty prop, LowerCtx ctx)
+        {
+            foreach (var kv in node.SlotByNum)
+            {
+                if (!ctx.Graph.Slots.TryGetValue(kv.Value, out var sl)) continue;
+                if (sl.IsOutput) continue;
+                if (sl.OutputName == prop.ReferenceName) return ctx.Input(node.Id, kv.Key);
+            }
+            throw new System.Exception(
+                $"SubGraphNode '{node.Id}' missing input slot for subgraph property '{prop.ReferenceName}'");
+        }
+
         // For each subgraph property (in declaration order), find the
         // SubGraphNode input slot whose m_ShaderOutputName matches the
         // property's reference name, lower the value flowing in, and produce
@@ -698,7 +730,9 @@ namespace HZExporter.ShaderGraph
             var args = new List<SgRhs>();
             foreach (var prop in sg.Properties)
             {
-                if (prop.IsInlineResource) continue;   // reaches the body through `mat`
+                if (prop.IsInlineResource || prop.IsGlobal) continue;   // reaches the body through `mat`
+                if (prop.Type == SgType.Texture2D || prop.Type == SgType.TextureCube)
+                    continue;                           // bound at the call site, not passed
                 // Unity's m_Id can be any 32-bit signed integer (often a hash
                 // — negative is common for subgraph property slots). Use a
                 // separate `found` flag instead of a sentinel value so a
@@ -1067,8 +1101,12 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
                 throw new System.NotImplementedException(
                     "ObjectNode renderer-bounds outputs have no engine equivalent (no per-draw bounds uniform)");
             if (!ctx.IsVertexStage)
-                throw new System.NotImplementedException(
-                    "ObjectNode in fragment stage needs a model-matrix varying the templates do not carry");
+                return new SgValue
+                {
+                    Rhs = Sg.Raw(outSlotNum == 1 ? "v_object_scale" : "v_object_world_pos"),
+                    Type = SgType.Vec3,
+                    IsTemp = false,
+                };
             if (outSlotNum == 1)
                 return new SgValue
                 {
@@ -1637,6 +1675,8 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
             // MaterialFS struct. Bool properties live in the engine struct
             // as `float` (engine constraint) — wrap with `> 0.5` so the
             // value flows back as a real bool.
+            if (ctx.BoundProperties.TryGetValue(prop.Id, out var boundVal)) return boundVal;
+
             string baseExpr = ctx.IsSubGraph ? prop.FieldName : "mat." + prop.FieldName;
             if (prop.Type == SgType.Bool)
                 return new SgValue
@@ -1872,6 +1912,10 @@ float _hz_gradient_noise(vec2 uv, float scale) {
                 throw new NotImplementedException(
                     $"CustomFunctionNode '{fnName}' has no entry in shader_mapping.json `customFunctions` — add an `engineCall`/`structType`/`structFields` mapping or the function name will go through as-is is not supported");
 
+            // Outputs backed by shader globals are plain MaterialFS reads — no call at all.
+            if (map.globals != null && map.globals.Count > 0)
+                return LowerGlobal(node, outSlotNum, ctx, map, fnName);
+
             // Functions the engine does not provide carry their own GLSL; the set dedupes it.
             if (map.glsl != null && map.glsl.Count > 0)
                 ctx.HelperFunctions.Add((map.engineCall, string.Join("\n", map.glsl)));
@@ -1903,7 +1947,7 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             if (!node.SlotByNum.TryGetValue(outSlotNum, out var slotId))
                 throw new Exception($"CustomFunctionNode: slot {outSlotNum} not in node");
             var outSlot = ctx.Graph.Slots[slotId];
-            string fieldName = SgNames.ToSnakeCase(outSlot.OutputName);
+            string fieldName = SgNames.ToFieldName(outSlot.OutputName);
             if (map.structFields != null && !map.structFields.Contains(fieldName))
                 throw new Exception(
                     $"CustomFunctionNode '{fnName}': slot '{outSlot.OutputName}' (-> '{fieldName}') not in mapping.structFields=[{string.Join(",", map.structFields)}]");
@@ -1920,6 +1964,56 @@ float _hz_gradient_noise(vec2 uv, float scale) {
         }
 
         public const string WhiteTextureSentinel = "HZ_SG_WHITE_TEXTURE";
+
+        // Binds one global-backed output, declaring the property on the final shader.
+        static SgValue LowerGlobal(SgNode node, int outSlotNum, LowerCtx ctx,
+                                   HZShaderMap.CustomFunctionMap map, string fnName)
+        {
+            if (!node.SlotByNum.TryGetValue(outSlotNum, out var slotId))
+                throw new Exception($"CustomFunctionNode: slot {outSlotNum} not in node");
+            var outSlot = ctx.Graph.Slots[slotId];
+            string field = SgNames.ToSnakeCase(outSlot.OutputName);
+
+            HZShaderMap.GlobalMap g = null;
+            foreach (var cand in map.globals) if (cand.field == field) { g = cand; break; }
+            if (g == null)
+                throw new NotImplementedException(
+                    $"CustomFunctionNode '{fnName}': output '{outSlot.OutputName}' (-> '{field}') has no `globals` entry");
+
+            SgType type = g.kind == "float" ? SgType.Float
+                        : g.kind == "texture_cube" ? SgType.TextureCube
+                        : SgType.Vec4;
+            DeclareGlobalProperty(ctx.Root, g, type);
+            ctx.UsesMaterial = true;
+
+            if (type == SgType.TextureCube)
+                return new SgValue
+                {
+                    Rhs = new SgRhsTextureRef { FieldName = g.slot },
+                    Type = SgType.TextureCube,
+                    IsTemp = false,
+                };
+
+            var want = outSlot.StaticType();
+            var rhs = Sg.Raw("mat." + g.slot);
+            if (type == SgType.Vec4 && want != SgType.Vec4 && want != SgType.Unknown)
+                return new SgValue { Rhs = SgCodegen.CoerceRhsForReturn(rhs, SgType.Vec4, want), Type = want, IsTemp = false };
+            return new SgValue { Rhs = rhs, Type = type, IsTemp = false };
+        }
+
+        static void DeclareGlobalProperty(SgGraph root, HZShaderMap.GlobalMap g, SgType type)
+        {
+            foreach (var p in root.Properties) if (p.FieldName == g.slot) return;
+            root.Properties.Add(new SgProperty
+            {
+                Id = "global:" + g.unity,
+                Name = g.unity,
+                ReferenceName = g.unity,
+                FieldName = g.slot,
+                Type = type,
+                IsGlobal = true,
+            });
+        }
     }
 
     // ===== registry ===========================================================

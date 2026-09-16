@@ -93,6 +93,18 @@ namespace HZExporter
             // Texture-typed output fields with no engine texture behind them; sampling one
             // yields the default white texture instead of a binding.
             public List<string> whiteTextureFields;
+            // Outputs sourced from Shader.SetGlobal* values rather than computed. They are
+            // scene constants, so the exporter reads them once and binds them per material.
+            public List<GlobalMap> globals;
+        }
+
+        [System.Serializable]
+        public class GlobalMap
+        {
+            public string field;   // custom-function output, snake_cased
+            public string unity;   // Unity global name, e.g. "_gEastColor"
+            public string slot;    // MaterialFS field the value binds to
+            public string kind;    // color4 | float | texture_cube
         }
 
         [System.Serializable]
@@ -618,6 +630,25 @@ namespace HZExporter
             foreach (var p in entry.properties ?? new List<PropertyMap>())
             {
                 if (string.IsNullOrEmpty(p.unity) || string.IsNullOrEmpty(p.slot) || string.IsNullOrEmpty(p.kind)) continue;
+                // globals live on Shader, not the material, so HasProperty says no
+                if (p.kind.StartsWith("global_"))
+                {
+                    switch (p.kind)
+                    {
+                        case "global_float":
+                            cm.properties.Add(new CustomProperty { slot = p.slot, kind = "float", f = Shader.GetGlobalFloat(p.unity) });
+                            break;
+                        case "global_color4":
+                            cm.properties.Add(new CustomProperty { slot = p.slot, kind = "color4", c4 = Shader.GetGlobalColor(p.unity) });
+                            break;
+                        case "global_texture_cube":
+                            break;   // bound from the cooked cubemap asset, not the glb
+                        default:
+                            Debug.LogWarning($"[HZShaderMap] unrecognized global kind '{p.kind}' for '{p.unity}'");
+                            break;
+                    }
+                    continue;
+                }
                 if (!mat.HasProperty(p.unity)) continue;
                 switch (p.kind)
                 {

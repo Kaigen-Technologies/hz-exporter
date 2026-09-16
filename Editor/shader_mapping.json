@@ -3808,6 +3808,132 @@
         "",
         "HzMainLightShadowFade hz_main_light_shadow_fade(vec3 world_pos) { HzMainLightShadowFade r; r.fade = 0.0; return r; }"
       ]
+    },
+    {
+      "name": "GetShaderGlobals",
+      "engineCall": "hz_shader_globals",
+      "structType": "HzShaderGlobals",
+      "globals": [
+        {
+          "field": "east_color",
+          "unity": "_gEastColor",
+          "slot": "g_east_color",
+          "kind": "color4"
+        },
+        {
+          "field": "west_color",
+          "unity": "_gWestColor",
+          "slot": "g_west_color",
+          "kind": "color4"
+        },
+        {
+          "field": "north_color",
+          "unity": "_gNorthColor",
+          "slot": "g_north_color",
+          "kind": "color4"
+        },
+        {
+          "field": "south_color",
+          "unity": "_gSouthColor",
+          "slot": "g_south_color",
+          "kind": "color4"
+        },
+        {
+          "field": "top_color",
+          "unity": "_gTopColor",
+          "slot": "g_top_color",
+          "kind": "color4"
+        },
+        {
+          "field": "gradient_radius",
+          "unity": "_gGradientRadius",
+          "slot": "g_gradient_radius",
+          "kind": "float"
+        },
+        {
+          "field": "height_min",
+          "unity": "_gHeightMin",
+          "slot": "g_height_min",
+          "kind": "float"
+        },
+        {
+          "field": "height_max",
+          "unity": "_gHeightMax",
+          "slot": "g_height_max",
+          "kind": "float"
+        },
+        {
+          "field": "height_falloff",
+          "unity": "_gHeightFalloff",
+          "slot": "g_height_falloff",
+          "kind": "float"
+        },
+        {
+          "field": "height_opacity",
+          "unity": "_gHeightOpacity",
+          "slot": "g_height_opacity",
+          "kind": "float"
+        },
+        {
+          "field": "height_color",
+          "unity": "_gHeightColor",
+          "slot": "g_height_color",
+          "kind": "color4"
+        },
+        {
+          "field": "distance_min",
+          "unity": "_gDistanceMin",
+          "slot": "g_distance_min",
+          "kind": "float"
+        },
+        {
+          "field": "distance_max",
+          "unity": "_gDistanceMax",
+          "slot": "g_distance_max",
+          "kind": "float"
+        },
+        {
+          "field": "distance_falloff",
+          "unity": "_gDistanceFalloff",
+          "slot": "g_distance_falloff",
+          "kind": "float"
+        },
+        {
+          "field": "distance_opacity",
+          "unity": "_gDistanceOpacity",
+          "slot": "g_distance_opacity",
+          "kind": "float"
+        },
+        {
+          "field": "distance_cube",
+          "unity": "_gDistanceCube",
+          "slot": "g_distance_cube",
+          "kind": "texture_cube"
+        }
+      ]
+    },
+    {
+      "name": "MurmurHash",
+      "engineCall": "hz_murmur_hash",
+      "structType": "HzMurmurHash",
+      "structFields": [
+        "p_out"
+      ],
+      "glsl": [
+        "struct HzMurmurHash { vec3 p_out; };",
+        "",
+        "HzMurmurHash hz_murmur_hash(vec3 p) {",
+        "    uvec3 p1 = uvec3(p);",
+        "    const uint M = 0x5bd1e995u;",
+        "    uvec3 h = uvec3(1190494759u, 2147483647u, 3559788179u);",
+        "    h *= M; h ^= h >> 24u; h *= M;",
+        "    h *= M; h ^= p1.x; h *= M; h ^= p1.y; h *= M; h ^= p1.z;",
+        "    h ^= h >> 13u; h *= M; h ^= h >> 15u;",
+        "    HzMurmurHash r;",
+        "    r.p_out = uintBitsToFloat((h & 0x007fffffu) | 0x3f800000u) - 1.0;",
+        "    return r;",
+        "}"
+      ]
     }
   ]
 }

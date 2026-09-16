@@ -184,6 +184,15 @@ public static class HZExportCommands
     // MaterialFS skips sampler states; cubemaps have no engine material-property path yet.
     static string KindForProperty(SgProperty prop)
     {
+        if (prop.IsGlobal)
+        {
+            switch (prop.Type)
+            {
+                case SgType.Float:       return "global_float";
+                case SgType.TextureCube: return "global_texture_cube";
+                default:                 return "global_color4";
+            }
+        }
         switch (prop.Type)
         {
             case SgType.Texture2D: return prop.IsNormalMap ? "texture_normal" : "texture";

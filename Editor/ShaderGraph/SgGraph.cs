@@ -182,6 +182,29 @@ namespace HZExporter.ShaderGraph
             while (result.Contains("__")) result = result.Replace("__", "_");
             return result.Trim('_');
         }
+
+        // GLSL identifier form of a Unity name: no leading digit, no keyword collision
+        // (a slot literally named "Out" would otherwise emit `vec3 out;`).
+        public static string ToFieldName(string s)
+        {
+            string f = ToSnakeCase(s);
+            if (f.Length == 0) return "_unnamed";
+            if (char.IsDigit(f[0]) || GlslReserved.Contains(f)) return "p_" + f;
+            return f;
+        }
+
+        public static readonly System.Collections.Generic.HashSet<string> GlslReserved =
+            new System.Collections.Generic.HashSet<string>
+        {
+            "attribute", "bool", "break", "buffer", "bvec2", "bvec3", "bvec4", "case", "centroid",
+            "coherent", "const", "continue", "default", "discard", "do", "double", "dvec2", "dvec3",
+            "dvec4", "else", "false", "flat", "float", "for", "highp", "if", "in", "inout", "int",
+            "invariant", "isampler2D", "ivec2", "ivec3", "ivec4", "layout", "lowp", "mat2", "mat3",
+            "mat4", "mediump", "noperspective", "out", "patch", "precision", "readonly", "restrict",
+            "return", "sample", "sampler2D", "sampler3D", "samplerCube", "shared", "smooth", "struct",
+            "subroutine", "switch", "true", "uint", "uniform", "usampler2D", "uvec2", "uvec3", "uvec4",
+            "varying", "vec2", "vec3", "vec4", "void", "volatile", "while", "writeonly",
+        };
     }
 
     // ===== graph nodes/slots/edges/properties =================================
@@ -285,6 +308,8 @@ namespace HZExporter.ShaderGraph
         public bool IsNormalMap;
         // Node-embedded resource: a material property of the final shader, never a subgraph input.
         public bool IsInlineResource;
+        // Value comes from a Unity shader global, read at export time.
+        public bool IsGlobal;
     }
 
     class SgStickyNote

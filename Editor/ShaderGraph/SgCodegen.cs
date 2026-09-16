@@ -230,6 +230,10 @@ namespace HZExporter.ShaderGraph
             // The unlit template carries the world-position varying only when the graph reads it
             // (ViewVectorNode / PositionNode in @fs); a vec3 varying on every unlit shader is not free.
             bool needsWorldPos = fsScan.Contains("v_world_pos") || vsBodyStr.Contains("v_world_pos");
+            // ObjectNode in @fs: origin and scale are constant per instance, so they ride flat
+            string objScan = fsScan + vsBodyStr;
+            bool needsObjPos = objScan.Contains("v_object_world_pos");
+            bool needsObjScale = objScan.Contains("v_object_scale");
 
             // Lit graphs that leave Base Color unwired are "implicit unlit" (their
             // output is driven through Emission). Skip the PBR lighting block and
@@ -251,6 +255,15 @@ namespace HZExporter.ShaderGraph
                 .Replace("${VS_MAT_UNPACK}",  vsMatUnpack)
                 .Replace("${VS_HELPERS}",   vsHelpers.ToString())
                 .Replace("${HELPERS}",      fsHelpers.ToString())
+                .Replace("${VS_OBJECT_OUT}",
+                         (needsObjPos ? "flat out vec3 v_object_world_pos;\n" : "")
+                         + (needsObjScale ? "flat out vec3 v_object_scale;\n" : ""))
+                .Replace("${VS_OBJECT_ASSIGN}",
+                         (needsObjPos ? "    v_object_world_pos = v.model[3].xyz;\n" : "")
+                         + (needsObjScale ? "    v_object_scale = vec3(length(v.model[0].xyz), length(v.model[1].xyz), length(v.model[2].xyz));\n" : ""))
+                .Replace("${FS_OBJECT_IN}",
+                         (needsObjPos ? "flat in vec3 v_object_world_pos;\n" : "")
+                         + (needsObjScale ? "flat in vec3 v_object_scale;\n" : ""))
                 .Replace("${VS_WORLD_POS_OUT}",    needsWorldPos ? "out vec3 v_world_pos;\n" : "")
                 .Replace("${VS_WORLD_POS_ASSIGN}", needsWorldPos ? "    v_world_pos = world_pos.xyz;\n" : "")
                 .Replace("${FS_WORLD_POS_IN}",     needsWorldPos ? "in vec3 v_world_pos;\n" : "")
@@ -646,7 +659,7 @@ out vec2 v_uv1;
 out vec4 v_color;
 flat out uint v_material_offset;
 out vec3 v_normal;
-${VS_WORLD_POS_OUT}#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_OUT}${VS_OBJECT_OUT}#ifdef HZ_RENDERER_GBUFFER
 out vec4 v_clip_cur;
 out vec4 v_clip_prev;
 #endif
@@ -661,7 +674,7 @@ ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0
     v_color = v.color;
     v_material_offset = v.material_offset;
     v_normal = normalize((v.model * vec4(${VS_NORMAL}, 0.0)).xyz);
-${VS_WORLD_POS_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_ASSIGN}${VS_OBJECT_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
     // jitter-free motion vectors through the previous model; time-driven vertex motion stays camera-only
     v_clip_cur = hz_scene.view_proj_unjittered * world_pos;
     v_clip_prev = hz_scene.prev_view_proj * (unpack_prev_model() * vec4(${VS_POS}, 1.0));
@@ -676,7 +689,7 @@ in vec2 v_uv1;
 in vec4 v_color;
 flat in uint v_material_offset;
 in vec3 v_normal;
-${FS_WORLD_POS_IN}layout(location = 0) out vec4 frag_color;
+${FS_WORLD_POS_IN}${FS_OBJECT_IN}layout(location = 0) out vec4 frag_color;
 ${GBUFFER_FS_OUTPUTS}
 ${MATERIAL_STRUCT}
 ${HELPERS}${FUNCTIONS}void main() {
@@ -691,7 +704,7 @@ ${GBUFFER_FS_WRITES}}
 @"@vs
 #define HZ_RENDERER_LIGHTING_CLUSTERS
 out vec3 v_world_pos;
-out vec3 v_object_pos;
+${VS_OBJECT_OUT}out vec3 v_object_pos;
 out vec3 v_normal;
 out vec2 v_uv;
 out vec2 v_uv1;
@@ -711,7 +724,7 @@ void main() {
 ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0);
     gl_Position = hz_scene.view_proj * world_pos;
     v_world_pos = world_pos.xyz;
-    v_object_pos = ${VS_POS};
+${VS_OBJECT_ASSIGN}    v_object_pos = ${VS_POS};
     v_normal = normalize((v.model * vec4(${VS_NORMAL}, 0.0)).xyz);
     v_tangent = normalize((v.model * vec4(${VS_TANGENT}, 0.0)).xyz);
     v_bitangent_sign = v.bitangent_sign;
@@ -734,7 +747,7 @@ ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0
 #define HZ_RENDERER_LIGHTING_CLUSTERS
 #define HZ_RENDERER_FOG
 ${FS_FEATURE_DEFINES}in vec3 v_world_pos;
-in vec3 v_object_pos;
+${FS_OBJECT_IN}in vec3 v_object_pos;
 in vec3 v_normal;
 in vec2 v_uv;
 in vec2 v_uv1;
@@ -779,7 +792,7 @@ layout(binding = 2) uniform _DrawParams {
 } hz_draw_params;
 
 out vec3 v_world_pos;
-out vec3 v_object_pos;
+${VS_OBJECT_OUT}out vec3 v_object_pos;
 out vec3 v_normal;
 out vec2 v_uv;
 out vec2 v_uv1;
@@ -822,7 +835,7 @@ void main() {
 #define HZ_RENDERER_LIGHTING_CLUSTERS
 #define HZ_RENDERER_FOG
 ${FS_FEATURE_DEFINES}in vec3 v_world_pos;
-in vec3 v_object_pos;
+${FS_OBJECT_IN}in vec3 v_object_pos;
 in vec3 v_normal;
 in vec2 v_uv;
 in vec2 v_uv1;
