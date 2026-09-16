@@ -1005,6 +1005,17 @@
           "kind": "color4"
         },
         {
+          "unity": "_SampleCubemap_21866bf3ac1d4479bd16a99c7c69e62c_Cube_1_Cubemap",
+          "slot": "sample_cubemap_21866bf_3ac_1d_4_bfff8167",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
+        },
+        {
           "unity": "_gSouthColor",
           "slot": "g_south_color",
           "kind": "global_color4"
@@ -1118,6 +1129,12 @@
           "kind": "float"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -1126,6 +1143,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -1388,7 +1416,8 @@
         {
           "unity": "_BuildingNormalCombine_LOD_1a4e49f361b64a23bb96074e1f9baeec__LargePanelNormals_1965204363_Texture2D",
           "slot": "building_normal_combine_lod_1a__cddb0c09",
-          "kind": "texture_normal"
+          "kind": "texture_normal",
+          "guid": "030f1f4f24936bc43a5945beb21f01ed"
         },
         {
           "unity": "_BuildingNormalCombine_LOD_1a4e49f361b64a23bb96074e1f9baeec__WindowMask_-1216845332_Texture2D",
@@ -1398,7 +1427,14 @@
         {
           "unity": "_SampleTexture2DLOD_a4d64c5096024d98933fc3a12ba5d9c2_Texture_1_Texture2D",
           "slot": "sample_texture_2dlod_a_4d_64c_5_a5203bd9",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "59f162eae71239f4db5095ff27c01c90"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -1409,6 +1445,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -1498,7 +1545,8 @@
         {
           "unity": "_SampleTexture2D_a0117470a5d844bb80d847ff764d689c_Texture_1_Texture2D",
           "slot": "sample_texture_2d_a_0117470a_5d_a3645c3f",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "030f1f4f24936bc43a5945beb21f01ed"
         }
       ]
     },
@@ -1614,6 +1662,12 @@
           "kind": "texture"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -1622,6 +1676,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -1784,12 +1849,19 @@
         {
           "unity": "_BuildingNormalCombine_b680151ab4df4942a48a31b5d406cd60__Albedo_-193820144_Texture2D",
           "slot": "building_normal_combine_b_68015_ed6783eb",
-          "kind": "texture_normal"
+          "kind": "texture_normal",
+          "guid": "6470f271fb760ab4781b1c8886f80c43"
         },
         {
           "unity": "_BuildingNormalCombine_b680151ab4df4942a48a31b5d406cd60__NormAO_2076225036_Texture2D",
           "slot": "building_normal_combine_b_68015_1d831d6a",
           "kind": "texture_normal"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -1800,6 +1872,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -1884,22 +1967,26 @@
         {
           "unity": "_SampleTexture2D_1749967cbc8147c9b122e1110fad4122_Texture_1_Texture2D",
           "slot": "sample_texture_2d_1749967cbc_81_f91affce",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "d697cae3d6005a7438fb6fb55eb44a51"
         },
         {
           "unity": "_SampleTexture2D_36316285b4e148fcbdfe74c591954024_Texture_1_Texture2D",
           "slot": "sample_texture_2d_36316285b_4e__a92a6487",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "5a5c027a23f3c6843bcd3f503016557e"
         },
         {
           "unity": "_SampleTexture2D_50dd326e982d4d8c9b8ce26a6a02e827_Texture_1_Texture2D",
           "slot": "sample_texture_2d_50dd_326e_982_4aaaff3e",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "030f1f4f24936bc43a5945beb21f01ed"
         },
         {
           "unity": "_SampleTexture2D_a0117470a5d844bb80d847ff764d689c_Texture_1_Texture2D",
           "slot": "sample_texture_2d_a_0117470a_5d_a3645c3f",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "030f1f4f24936bc43a5945beb21f01ed"
         }
       ]
     },
@@ -1908,7 +1995,322 @@
       "engineShader": "/shaders/unity/custom_lighting_buildings_b.hz.glsl",
       "engineSkinnedShader": "/shaders/unity/custom_lighting_buildings_b.hz.glsl",
       "customShader": true,
-      "properties": []
+      "properties": [
+        {
+          "unity": "_Inset_Y_Max",
+          "slot": "inset_y_max",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindowHeight",
+          "slot": "window_height",
+          "kind": "float"
+        },
+        {
+          "unity": "_BaseColor",
+          "slot": "base_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_WindowSmoothness",
+          "slot": "window_smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Max_Windows_Y",
+          "slot": "max_windows_y",
+          "kind": "float"
+        },
+        {
+          "unity": "_WallSmoothness",
+          "slot": "wall_smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metallic",
+          "slot": "metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_Reflectance",
+          "slot": "reflectance",
+          "kind": "float"
+        },
+        {
+          "unity": "_NormAO",
+          "slot": "norm_ao",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Inset_Y",
+          "slot": "inset_y",
+          "kind": "float"
+        },
+        {
+          "unity": "_YPosition",
+          "slot": "y_position",
+          "kind": "float"
+        },
+        {
+          "unity": "_Min_Windows_Y",
+          "slot": "min_windows_y",
+          "kind": "float"
+        },
+        {
+          "unity": "_Tint3",
+          "slot": "tint_3",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Tint4",
+          "slot": "tint_4",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Tint2",
+          "slot": "tint_2",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Tint1",
+          "slot": "tint_1",
+          "kind": "color4"
+        },
+        {
+          "unity": "_RandomOn",
+          "slot": "random_on",
+          "kind": "float"
+        },
+        {
+          "unity": "_random_Colors",
+          "slot": "random_colors",
+          "kind": "float"
+        },
+        {
+          "unity": "_Seed",
+          "slot": "seed",
+          "kind": "float"
+        },
+        {
+          "unity": "_Exposure",
+          "slot": "exposure",
+          "kind": "float"
+        },
+        {
+          "unity": "_RandomXZScale",
+          "slot": "random_xz_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_Windows_X",
+          "slot": "windows_x",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindowWidth",
+          "slot": "window_width",
+          "kind": "float"
+        },
+        {
+          "unity": "_Inset_X",
+          "slot": "inset_x",
+          "kind": "float"
+        },
+        {
+          "unity": "_WindowSoften",
+          "slot": "window_soften",
+          "kind": "float"
+        },
+        {
+          "unity": "_LargePanelScale",
+          "slot": "large_panel_scale",
+          "kind": "float"
+        },
+        {
+          "unity": "_dirt",
+          "slot": "dirt",
+          "kind": "float"
+        },
+        {
+          "unity": "_LargePanelNormals",
+          "slot": "large_panel_normals",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_LargePanelAlbedo",
+          "slot": "large_panel_albedo",
+          "kind": "texture"
+        },
+        {
+          "unity": "_meshSCale",
+          "slot": "mesh_s_cale",
+          "kind": "float"
+        },
+        {
+          "unity": "_InteriorRooms",
+          "slot": "interior_rooms",
+          "kind": "float"
+        },
+        {
+          "unity": "_SampleCubemap_45a686d44134490bbeb56342249ece61_Cube_1_Cubemap",
+          "slot": "sample_cubemap_45a_686d_4413449_402c7a41",
+          "kind": "texture_cube",
+          "guid": "1824678e10e2a2b48b356240bcedccd1"
+        },
+        {
+          "unity": "_SampleTexture2DLOD_a4d64c5096024d98933fc3a12ba5d9c2_Texture_1_Texture2D",
+          "slot": "sample_texture_2dlod_a_4d_64c_5_a5203bd9",
+          "kind": "texture",
+          "guid": "59f162eae71239f4db5095ff27c01c90"
+        },
+        {
+          "unity": "_BuildingNormalCombine_b680151ab4df4942a48a31b5d406cd60__LargePanelNormals_1965204363_Texture2D",
+          "slot": "building_normal_combine_b_68015_18a8cf37",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_BuildingNormalCombine_b680151ab4df4942a48a31b5d406cd60__Albedo_-193820144_Texture2D",
+          "slot": "building_normal_combine_b_68015_ed6783eb",
+          "kind": "texture_normal",
+          "guid": "6470f271fb760ab4781b1c8886f80c43"
+        },
+        {
+          "unity": "_BuildingNormalCombine_b680151ab4df4942a48a31b5d406cd60__NormAO_2076225036_Texture2D",
+          "slot": "building_normal_combine_b_68015_1d831d6a",
+          "kind": "texture_normal"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
+          "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
+          "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
+        },
+        {
+          "unity": "_gSouthColor",
+          "slot": "g_south_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gTopColor",
+          "slot": "g_top_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gWestColor",
+          "slot": "g_west_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gNorthColor",
+          "slot": "g_north_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gEastColor",
+          "slot": "g_east_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gGradientRadius",
+          "slot": "g_gradient_radius",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightMin",
+          "slot": "g_height_min",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightMax",
+          "slot": "g_height_max",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightFalloff",
+          "slot": "g_height_falloff",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightOpacity",
+          "slot": "g_height_opacity",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightColor",
+          "slot": "g_height_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gDistanceMin",
+          "slot": "g_distance_min",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceMax",
+          "slot": "g_distance_max",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceFalloff",
+          "slot": "g_distance_falloff",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceOpacity",
+          "slot": "g_distance_opacity",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceCube",
+          "slot": "g_distance_cube",
+          "kind": "global_texture_cube"
+        },
+        {
+          "unity": "_SampleTexture2D_1749967cbc8147c9b122e1110fad4122_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_1749967cbc_81_f91affce",
+          "kind": "texture",
+          "guid": "d697cae3d6005a7438fb6fb55eb44a51"
+        },
+        {
+          "unity": "_SampleTexture2D_36316285b4e148fcbdfe74c591954024_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_36316285b_4e__a92a6487",
+          "kind": "texture",
+          "guid": "5a5c027a23f3c6843bcd3f503016557e"
+        },
+        {
+          "unity": "_SampleTexture2D_50dd326e982d4d8c9b8ce26a6a02e827_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_50dd_326e_982_4aaaff3e",
+          "kind": "texture",
+          "guid": "030f1f4f24936bc43a5945beb21f01ed"
+        },
+        {
+          "unity": "_SampleTexture2D_a0117470a5d844bb80d847ff764d689c_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_a_0117470a_5d_a3645c3f",
+          "kind": "texture",
+          "guid": "030f1f4f24936bc43a5945beb21f01ed"
+        }
+      ]
     },
     {
       "unityShader": "Shader Graphs/CustomLightingIridescence",
@@ -1949,7 +2351,14 @@
         {
           "unity": "_SampleTexture2D_038528536dc741f49f50b2397b9d3c7f_Texture_1_Texture2D",
           "slot": "sample_texture_2d_038528536dc_7_cd8d5f68",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "52d768edf673e4644ad974aca48d7614"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -1960,6 +2369,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -2117,12 +2537,19 @@
         {
           "unity": "_BuildingNormalCombine_LOD_1a4e49f361b64a23bb96074e1f9baeec__LargePanelNormals_1965204363_Texture2D",
           "slot": "building_normal_combine_lod_1a__cddb0c09",
-          "kind": "texture_normal"
+          "kind": "texture_normal",
+          "guid": "030f1f4f24936bc43a5945beb21f01ed"
         },
         {
           "unity": "_BuildingNormalCombine_LOD_1a4e49f361b64a23bb96074e1f9baeec__WindowMask_-1216845332_Texture2D",
           "slot": "building_normal_combine_lod_1a__457b9fd1",
           "kind": "texture_normal"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -2133,6 +2560,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -2222,7 +2660,8 @@
         {
           "unity": "_SampleTexture2D_a0117470a5d844bb80d847ff764d689c_Texture_1_Texture2D",
           "slot": "sample_texture_2d_a_0117470a_5d_a3645c3f",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "030f1f4f24936bc43a5945beb21f01ed"
         }
       ]
     },
@@ -2273,6 +2712,12 @@
           "kind": "texture"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -2281,6 +2726,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -2436,6 +2892,12 @@
           "kind": "texture"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -2444,6 +2906,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -2532,7 +3005,152 @@
       "engineShader": "/shaders/unity/custom_lighting_buildings.hz.glsl",
       "engineSkinnedShader": "/shaders/unity/custom_lighting_buildings.hz.glsl",
       "customShader": true,
-      "properties": []
+      "properties": [
+        {
+          "unity": "_BaseColor",
+          "slot": "base_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Smoothness",
+          "slot": "smoothness",
+          "kind": "float"
+        },
+        {
+          "unity": "_Metallic",
+          "slot": "metallic",
+          "kind": "float"
+        },
+        {
+          "unity": "_Reflectance",
+          "slot": "reflectance",
+          "kind": "float"
+        },
+        {
+          "unity": "_NormAO",
+          "slot": "norm_ao",
+          "kind": "texture"
+        },
+        {
+          "unity": "_SampleTexture2D_b7ff54d252e94ca0a731c4faa9d8bc9d_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_b_7ff_54d_252_c87740ff",
+          "kind": "texture",
+          "guid": "c0f8fb2951d1fc54893c88f5c4117997"
+        },
+        {
+          "unity": "_SampleCubemap_d360dac9b3b943c6a2925741addce0c9_Cube_1_Cubemap",
+          "slot": "sample_cubemap_d_360dac_9b_3b_9_cc9d0fc0",
+          "kind": "texture_cube",
+          "guid": "b8b3d5011b9664b4faafbea0af0509df"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
+          "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
+          "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
+        },
+        {
+          "unity": "_gSouthColor",
+          "slot": "g_south_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gTopColor",
+          "slot": "g_top_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gWestColor",
+          "slot": "g_west_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gNorthColor",
+          "slot": "g_north_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gEastColor",
+          "slot": "g_east_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gGradientRadius",
+          "slot": "g_gradient_radius",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightMin",
+          "slot": "g_height_min",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightMax",
+          "slot": "g_height_max",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightFalloff",
+          "slot": "g_height_falloff",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightOpacity",
+          "slot": "g_height_opacity",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gHeightColor",
+          "slot": "g_height_color",
+          "kind": "global_color4"
+        },
+        {
+          "unity": "_gDistanceMin",
+          "slot": "g_distance_min",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceMax",
+          "slot": "g_distance_max",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceFalloff",
+          "slot": "g_distance_falloff",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceOpacity",
+          "slot": "g_distance_opacity",
+          "kind": "global_float"
+        },
+        {
+          "unity": "_gDistanceCube",
+          "slot": "g_distance_cube",
+          "kind": "global_texture_cube"
+        }
+      ]
     },
     {
       "unityShader": "Shader Graphs/CustomLightingGlow",
@@ -2613,7 +3231,14 @@
         {
           "unity": "_SampleTexture2D_3781c1402275424dbadf74e0ac450ccb_Texture_1_Texture2D",
           "slot": "sample_texture_2d_3781c_1402275_69097011",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "52d768edf673e4644ad974aca48d7614"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -2624,6 +3249,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -2748,6 +3384,12 @@
           "kind": "texture"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -2756,6 +3398,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -2858,7 +3511,8 @@
         {
           "unity": "_SampleTexture2D_bcd442ee0df04c2db113eb5e2346c3fb_Texture_1_Texture2D",
           "slot": "sample_texture_2d_bcd_442ee_0df_a083d96d",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "26ea036190e38064d862d5a0702e95a5"
         }
       ]
     },
@@ -2911,7 +3565,14 @@
         {
           "unity": "_SampleTexture2D_45e862e3016a44a3bd36cae01912530a_Texture_1_Texture2D",
           "slot": "sample_texture_2d_45e_862e_3016_6a9ae830",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "d697cae3d6005a7438fb6fb55eb44a51"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -2922,6 +3583,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -3044,12 +3716,20 @@
         {
           "unity": "_SampleTexture2D_42e63e93089644b080ddd4380732a9e7_Texture_1_Texture2D",
           "slot": "sample_texture_2d_42e_63e_93089_956cfb01",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "52d768edf673e4644ad974aca48d7614"
         },
         {
           "unity": "_SampleTexture2D_867f3da2938842e1af3dc5453a27f143_Texture_1_Texture2D",
           "slot": "sample_texture_2d_867f_3da_2938_07cf31ef",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "ed2cc333a034d794e9f01fd5f0c780d2"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -3060,6 +3740,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -3170,6 +3861,12 @@
           "kind": "color4"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -3178,6 +3875,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -3315,7 +4023,14 @@
         {
           "unity": "_SampleTexture2D_038528536dc741f49f50b2397b9d3c7f_Texture_1_Texture2D",
           "slot": "sample_texture_2d_038528536dc_7_cd8d5f68",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "52d768edf673e4644ad974aca48d7614"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -3326,6 +4041,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -3441,6 +4167,12 @@
           "kind": "float"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -3449,6 +4181,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -3544,7 +4287,33 @@
       "engineShader": "/shaders/unity/storefronts_light.hz.glsl",
       "engineSkinnedShader": "/shaders/unity/storefronts_light.hz.glsl",
       "customShader": true,
-      "properties": []
+      "properties": [
+        {
+          "unity": "_Cull_Distance",
+          "slot": "cull_distance",
+          "kind": "float"
+        },
+        {
+          "unity": "_Cull_Fade",
+          "slot": "cull_fade",
+          "kind": "float"
+        },
+        {
+          "unity": "_Facades_Light_Atlas",
+          "slot": "facades_light_atlas",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Intensity",
+          "slot": "intensity",
+          "kind": "float"
+        },
+        {
+          "unity": "_SampleTexture2D_11ae3a2ab4b04cab854216e5c5cae8c4_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_11ae_3a_2ab_4_2b79ae9d",
+          "kind": "texture"
+        }
+      ]
     },
     {
       "unityShader": "Shader Graphs/SG_Airduct",
@@ -3555,17 +4324,26 @@
         {
           "unity": "_SampleTexture2D_7490b05ff5d4411aa6416c857f046362_Texture_1_Texture2D",
           "slot": "sample_texture_2d_7490b_05ff_5d_bfba069d",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "11386b4599e9d734298bc47be5a36c4c"
         },
         {
           "unity": "_SampleTexture2D_7d9f9f14f18e456d82f826acf843d11c_Texture_1_Texture2D",
           "slot": "sample_texture_2d_7d_9f_9f_14f__c47d6e81",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "622c080cbeaaca3408a3dceda171e036"
         },
         {
           "unity": "_SampleTexture2D_e985932a02554418946b27b1123d1040_Texture_1_Texture2D",
           "slot": "sample_texture_2d_e_985932a_025_04064127",
-          "kind": "texture"
+          "kind": "texture",
+          "guid": "180f09cc73bd10e4cac081580d053e7a"
+        },
+        {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
         },
         {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
@@ -3576,6 +4354,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -3664,7 +4453,73 @@
       "engineShader": "/shaders/unity/storefronts.hz.glsl",
       "engineSkinnedShader": "/shaders/unity/storefronts.hz.glsl",
       "customShader": true,
-      "properties": []
+      "properties": [
+        {
+          "unity": "_Cubemap",
+          "slot": "cubemap",
+          "kind": "texture_cube"
+        },
+        {
+          "unity": "_TintAlpha",
+          "slot": "tint_alpha",
+          "kind": "color4"
+        },
+        {
+          "unity": "_LerpColor",
+          "slot": "lerp_color",
+          "kind": "color4"
+        },
+        {
+          "unity": "_Curtain",
+          "slot": "curtain",
+          "kind": "texture"
+        },
+        {
+          "unity": "_Storefronts_Atlas",
+          "slot": "storefronts_atlas",
+          "kind": "texture"
+        },
+        {
+          "unity": "_AtlasSize",
+          "slot": "atlas_size",
+          "kind": "vec2"
+        },
+        {
+          "unity": "_RandomShowRatio",
+          "slot": "random_show_ratio",
+          "kind": "float"
+        },
+        {
+          "unity": "_Cull_Distance",
+          "slot": "cull_distance",
+          "kind": "float"
+        },
+        {
+          "unity": "_Cull_Fade",
+          "slot": "cull_fade",
+          "kind": "float"
+        },
+        {
+          "unity": "_Curtains_MinMax_Offset",
+          "slot": "curtains_min_max_offset",
+          "kind": "vec2"
+        },
+        {
+          "unity": "_SampleCubemap_3e372c57bd68494bbe3fe8198b779184_Cube_1_Cubemap",
+          "slot": "sample_cubemap_3e_372c_57bd_684_1fa380f3",
+          "kind": "texture_cube"
+        },
+        {
+          "unity": "_SampleTexture2D_a584c9453d9f4722859681e8f2c50d86_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_a_584c_9453d__f673d964",
+          "kind": "texture"
+        },
+        {
+          "unity": "_SampleTexture2D_f6dcc9e0bd6847ffa735d17556982548_Texture_1_Texture2D",
+          "slot": "sample_texture_2d_f_6dcc_9e_0bd_885d0665",
+          "kind": "texture"
+        }
+      ]
     },
     {
       "unityShader": "Shader Graphs/HologramProjector",
@@ -3741,6 +4596,12 @@
           "kind": "float"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -3749,6 +4610,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",
@@ -3864,6 +4736,12 @@
           "kind": "float"
         },
         {
+          "unity": "_SampleCubemap_594ca192011f4c56a10ca20621fca00d_Cube_1_Cubemap",
+          "slot": "sample_cubemap_594ca_192011f_4c_1c52f69b",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
           "unity": "_SampleTexture2D_04d0f48046c142e8a9c474eef41115e1_Texture_1_Texture2D",
           "slot": "sample_texture_2d_04d_0f_48046c_5ccec3a3",
           "kind": "texture"
@@ -3872,6 +4750,17 @@
           "unity": "_Output_a41a73bd8ff543578dad999453feddb5_ShadowMap_4_Texture2D",
           "slot": "output_a_41a_73bd_8ff_543578dad_670baf5b",
           "kind": "texture"
+        },
+        {
+          "unity": "_SampleCubemap_281dfdcc384546ff918a14c5eaba5b67_Cube_1_Cubemap",
+          "slot": "sample_cubemap_281dfdcc_384546f_a49c3792",
+          "kind": "texture_cube",
+          "guid": "3214bb5eb1fc4354585ad9bdad9198e1"
+        },
+        {
+          "unity": "_Output_7add0bc81f03404d8ae41909d09c0319_DistanceCube_16_Cubemap",
+          "slot": "output_7add_0bc_81f_03404d_8ae__763c4c86",
+          "kind": "texture_cube"
         },
         {
           "unity": "_gSouthColor",

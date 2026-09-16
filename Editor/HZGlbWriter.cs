@@ -1839,7 +1839,10 @@ namespace HZExporter
                         json.Append("\"type\": \"MAT_PROP_COLOR4\", \"c4\": [" + F(p.c4.r) + ", " + F(p.c4.g) + ", " + F(p.c4.b) + ", " + F(p.c4.a) + "] }");
                         break;
                     case "texture":
-                        json.Append("\"type\": \"MAT_PROP_TEXTURE\", \"texture_index\": " + p.textureIndex + " }");
+                        if (!string.IsNullOrEmpty(p.texturePath))
+                            json.Append("\"type\": \"MAT_PROP_TEXTURE\", \"texture_path\": \"" + EscapeJson(p.texturePath) + "\" }");
+                        else
+                            json.Append("\"type\": \"MAT_PROP_TEXTURE\", \"texture_index\": " + p.textureIndex + " }");
                         break;
                     default:
                         json.Append("\"type\": \"MAT_PROP_UNKNOWN\" }");

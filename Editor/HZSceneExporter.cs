@@ -83,6 +83,11 @@ namespace HZExporter
             public Vector3 splitShadows, splitHighlights;   // Unity colour as URP uses it (gamma) - 0.5
             public float splitBalance;                      // Unity balance / 100
             public Vector3 mixerRed, mixerGreen, mixerBlue; // Unity row / 100 - unit row
+            // Lift/Gamma/Gain and Shadows/Midtones/Highlights trackballs, raw as URP stores them
+            // (xyz colour, w master). All-zero means the override is absent and the engine skips it.
+            public Vector4 lggLift, lggGamma, lggGain;
+            public Vector4 smhShadows, smhMidtones, smhHighlights;
+            public Vector4 shaHiLimits;                     // shadows start/end, highlights start/end
             // Depth of field: engine DofMode 0 off, 1 physical (URP Bokeh), 2 range (URP Gaussian).
             public uint dofMode;
             public float dofFocusDistance, dofFocalLength, dofAperture; // metres, metres, f-number
@@ -231,6 +236,15 @@ namespace HZExporter
         }
 
         // ============= .hzt text format writers =============
+
+        static void AppendVec4(StringBuilder sb, string name, Vector4 v)
+        {
+            sb.AppendLine($"  {name}");
+            sb.AppendLine($"    x {F(v.x)}");
+            sb.AppendLine($"    y {F(v.y)}");
+            sb.AppendLine($"    z {F(v.z)}");
+            sb.AppendLine($"    w {F(v.w)}");
+        }
 
         static void AppendVec3(StringBuilder sb, string name, Vector3 v)
 
@@ -607,6 +621,13 @@ namespace HZExporter
                 AppendVec3(sb, "mixer_red", pp.mixerRed);
                 AppendVec3(sb, "mixer_green", pp.mixerGreen);
                 AppendVec3(sb, "mixer_blue", pp.mixerBlue);
+                AppendVec4(sb, "lgg_lift", pp.lggLift);
+                AppendVec4(sb, "lgg_gamma", pp.lggGamma);
+                AppendVec4(sb, "lgg_gain", pp.lggGain);
+                AppendVec4(sb, "smh_shadows", pp.smhShadows);
+                AppendVec4(sb, "smh_midtones", pp.smhMidtones);
+                AppendVec4(sb, "smh_highlights", pp.smhHighlights);
+                AppendVec4(sb, "sha_hi_limits", pp.shaHiLimits);
                 sb.AppendLine($"  dof_mode {pp.dofMode}");
                 sb.AppendLine($"  dof_focus_distance {F(pp.dofFocusDistance)}");
                 sb.AppendLine($"  dof_focal_length {F(pp.dofFocalLength)}");

@@ -65,27 +65,7 @@ namespace HZExporter
                     return false;
                 }
 
-                eqRT = new RenderTexture(eqWidth, eqHeight, 0, RenderTextureFormat.ARGBFloat)
-                {
-                    hideFlags = HideFlags.HideAndDontSave,
-                };
-                eqRT.Create();
-
-                mat = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
-                mat.SetTexture("_Cubemap", cubeRT);
-                Graphics.Blit(null, eqRT, mat);
-
-                eqTex = new Texture2D(eqWidth, eqHeight, TextureFormat.RGBAFloat, false, true);
-                var prevActive = RenderTexture.active;
-                RenderTexture.active = eqRT;
-                eqTex.ReadPixels(new Rect(0, 0, eqWidth, eqHeight), 0, 0, false);
-                RenderTexture.active = prevActive;
-
-                Color[] pixels = eqTex.GetPixels();
-
-                Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
-                WriteRadianceHDR(outputPath, pixels, eqWidth, eqHeight);
-
+                if (!ExportCubemap(cubeRT, outputPath, eqWidth)) return false;
                 Debug.Log($"[HZSkyboxExporter] Exported → {outputPath} ({eqWidth}x{eqHeight}, source skybox: {(RenderSettings.skybox != null ? RenderSettings.skybox.name : "<procedural>")})");
                 return true;
             }
@@ -96,6 +76,55 @@ namespace HZExporter
                 if (eqRT != null) { eqRT.Release(); UnityEngine.Object.DestroyImmediate(eqRT); }
                 if (cubeRT != null) { cubeRT.Release(); UnityEngine.Object.DestroyImmediate(cubeRT); }
                 if (camGO != null) UnityEngine.Object.DestroyImmediate(camGO);
+            }
+        }
+
+        /// <summary>Project any cubemap (asset Cubemap or cube RenderTexture) to an equirect
+        /// Radiance .hdr using the same projection the engine's env_sample_equirect assumes.
+        /// The engine's texture cook reads the .hdr back into a 6-face RGBA16F KTX.</summary>
+        /// <param name="cube">Cube-dimension source texture.</param>
+        /// <param name="outputPath">Absolute .hdr path.</param>
+        /// <param name="eqWidth">Equirect width. Height = width/2.</param>
+        public static bool ExportCubemap(Texture cube, string outputPath, int eqWidth = 1024)
+        {
+            if (cube == null) { Debug.LogError("[HZSkyboxExporter] ExportCubemap: null cubemap"); return false; }
+            var shader = Shader.Find(SHADER_NAME);
+            if (shader == null)
+            {
+                Debug.LogError($"[HZSkyboxExporter] Shader '{SHADER_NAME}' not found.");
+                return false;
+            }
+            int eqHeight = eqWidth / 2;
+            RenderTexture eqRT = null;
+            Texture2D eqTex = null;
+            Material mat = null;
+            try
+            {
+                eqRT = new RenderTexture(eqWidth, eqHeight, 0, RenderTextureFormat.ARGBFloat)
+                {
+                    hideFlags = HideFlags.HideAndDontSave,
+                };
+                eqRT.Create();
+
+                mat = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+                mat.SetTexture("_Cubemap", cube);
+                Graphics.Blit(null, eqRT, mat);
+
+                eqTex = new Texture2D(eqWidth, eqHeight, TextureFormat.RGBAFloat, false, true);
+                var prevActive = RenderTexture.active;
+                RenderTexture.active = eqRT;
+                eqTex.ReadPixels(new Rect(0, 0, eqWidth, eqHeight), 0, 0, false);
+                RenderTexture.active = prevActive;
+
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+                WriteRadianceHDR(outputPath, eqTex.GetPixels(), eqWidth, eqHeight);
+                return true;
+            }
+            finally
+            {
+                if (eqTex != null) UnityEngine.Object.DestroyImmediate(eqTex);
+                if (mat != null) UnityEngine.Object.DestroyImmediate(mat);
+                if (eqRT != null) { eqRT.Release(); UnityEngine.Object.DestroyImmediate(eqRT); }
             }
         }
 

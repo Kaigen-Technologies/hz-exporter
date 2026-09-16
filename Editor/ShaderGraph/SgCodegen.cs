@@ -215,6 +215,12 @@ namespace HZExporter.ShaderGraph
                 ciIn  += "in " + SgTypes.Glsl(ciType) + " " + ciSym + ";" + "\n";
             }
             SgOptimize.Run(vsCtx.Statements, vsAssigns);
+            // the interpolator lowering above can register vertex helpers, and vsHelpers was
+            // captured before it ran
+            vsHelpers.Length = 0;
+            foreach (var h in vsCtx.HelperFunctions) vsHelpers.Append(h.body).Append("\n\n");
+            vsFunctions.Length = 0;
+            foreach (var fn in vsCtx.Functions) vsFunctions.Append(FormatFunction(fn)).Append('\n');
 
             // ----- format bodies -------------------------------------------
             var vsBody = new StringBuilder();
@@ -278,6 +284,8 @@ namespace HZExporter.ShaderGraph
             bool needsTangent = objScan.Contains("v_tangent");
             bool needsBitan = objScan.Contains("v_bitangent_sign");
             bool needsObjNrm = objScan.Contains("v_object_normal");
+            bool needsInvModel = objScan.Contains("v_inv_model0");
+            bool needsObjPos2 = objScan.Contains("v_object_pos");
 
             // Lit graphs that leave Base Color unwired are "implicit unlit" (their
             // output is driven through Emission). Skip the PBR lighting block and
@@ -299,6 +307,12 @@ namespace HZExporter.ShaderGraph
                 .Replace("${VS_MAT_UNPACK}",  vsMatUnpack)
                 .Replace("${VS_HELPERS}",   vsHelpers.ToString() + vsFunctions.ToString())
                 .Replace("${HELPERS}",      fsHelpers.ToString())
+                .Replace("${VS_OBJPOS_OUT}",    needsObjPos2 ? "out vec3 v_object_pos;\n" : "")
+                .Replace("${VS_OBJPOS_ASSIGN}", needsObjPos2 ? "    v_object_pos = v.pos;\n" : "")
+                .Replace("${FS_OBJPOS_IN}",     needsObjPos2 ? "in vec3 v_object_pos;\n" : "")
+                .Replace("${VS_INVMODEL_OUT}",    needsInvModel ? "flat out vec4 v_inv_model0;\nflat out vec4 v_inv_model1;\nflat out vec4 v_inv_model2;\nflat out vec4 v_inv_model3;\n" : "")
+                .Replace("${VS_INVMODEL_ASSIGN}", needsInvModel ? "    mat4 _inv_model = inverse(v.model);\n    v_inv_model0 = _inv_model[0];\n    v_inv_model1 = _inv_model[1];\n    v_inv_model2 = _inv_model[2];\n    v_inv_model3 = _inv_model[3];\n" : "")
+                .Replace("${FS_INVMODEL_IN}",     needsInvModel ? "flat in vec4 v_inv_model0;\nflat in vec4 v_inv_model1;\nflat in vec4 v_inv_model2;\nflat in vec4 v_inv_model3;\n" : "")
                 .Replace("${VS_OBJNRM_OUT}",    needsObjNrm ? "out vec3 v_object_normal;\n" : "")
                 .Replace("${VS_OBJNRM_ASSIGN}", needsObjNrm ? "    v_object_normal = v.normal;\n" : "")
                 .Replace("${FS_OBJNRM_IN}",     needsObjNrm ? "in vec3 v_object_normal;\n" : "")
@@ -720,7 +734,7 @@ out vec2 v_uv1;
 out vec4 v_color;
 flat out uint v_material_offset;
 out vec3 v_normal;
-${VS_WORLD_POS_OUT}${VS_OBJECT_OUT}${VS_CI_OUT}${VS_TANGENT_OUT}${VS_BITAN_OUT}${VS_OBJNRM_OUT}#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_OUT}${VS_OBJECT_OUT}${VS_CI_OUT}${VS_TANGENT_OUT}${VS_BITAN_OUT}${VS_OBJNRM_OUT}${VS_INVMODEL_OUT}${VS_OBJPOS_OUT}#ifdef HZ_RENDERER_GBUFFER
 out vec4 v_clip_cur;
 out vec4 v_clip_prev;
 #endif
@@ -735,7 +749,7 @@ ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0
     v_color = v.color;
     v_material_offset = v.material_offset;
     v_normal = normalize((v.model * vec4(${VS_NORMAL}, 0.0)).xyz);
-${VS_WORLD_POS_ASSIGN}${VS_OBJECT_ASSIGN}${VS_TANGENT_ASSIGN}${VS_BITAN_ASSIGN}${VS_OBJNRM_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_ASSIGN}${VS_OBJECT_ASSIGN}${VS_TANGENT_ASSIGN}${VS_BITAN_ASSIGN}${VS_OBJNRM_ASSIGN}${VS_INVMODEL_ASSIGN}${VS_OBJPOS_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
     // jitter-free motion vectors through the previous model; time-driven vertex motion stays camera-only
     v_clip_cur = hz_scene.view_proj_unjittered * world_pos;
     v_clip_prev = hz_scene.prev_view_proj * (unpack_prev_model() * vec4(${VS_POS}, 1.0));
@@ -750,7 +764,7 @@ in vec2 v_uv1;
 in vec4 v_color;
 flat in uint v_material_offset;
 in vec3 v_normal;
-${FS_WORLD_POS_IN}${FS_OBJECT_IN}${FS_CI_IN}${FS_TANGENT_IN}${FS_BITAN_IN}${FS_OBJNRM_IN}layout(location = 0) out vec4 frag_color;
+${FS_WORLD_POS_IN}${FS_OBJECT_IN}${FS_CI_IN}${FS_TANGENT_IN}${FS_BITAN_IN}${FS_OBJNRM_IN}${FS_INVMODEL_IN}${FS_OBJPOS_IN}layout(location = 0) out vec4 frag_color;
 ${GBUFFER_FS_OUTPUTS}
 ${MATERIAL_STRUCT}
 ${HELPERS}${FUNCTIONS}void main() {

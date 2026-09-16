@@ -169,6 +169,25 @@ namespace HZExporter.ShaderGraph
         // A resource dropped on a Sample node's slot becomes a hidden Unity material property named
         // _<NodeName without spaces>_<nodeObjectId>_<slotOutputName>_<slotId>_<Type>. Mirroring that
         // name exactly is what lets the material exporter read the value back off the Unity material.
+        // "{\"texture\":{\"fileID\":..,\"guid\":\"<32 hex>\",..}}" nested inside m_Texture/m_Cubemap
+        static string ExtractResourceGuid(Dictionary<string, object> slotObj)
+        {
+            foreach (var key in new[] { "m_Texture", "m_Cubemap" })
+            {
+                if (!slotObj.TryGetValue(key, out var o) || !(o is Dictionary<string, object> dd)) continue;
+                foreach (var inner in dd.Values)
+                {
+                    if (!(inner is string js)) continue;
+                    int i = js.IndexOf("\"guid\":", System.StringComparison.Ordinal);
+                    if (i < 0) continue;
+                    int q1 = js.IndexOf('"', i + 7);
+                    int q2 = q1 >= 0 ? js.IndexOf('"', q1 + 1) : -1;
+                    if (q1 >= 0 && q2 > q1) return js.Substring(q1 + 1, q2 - q1 - 1);
+                }
+            }
+            return null;
+        }
+
         static void AddInlineResourceProperty(SgGraph g, SgNode node, SgSlot slot, string slotId)
         {
             string concrete;
@@ -193,6 +212,7 @@ namespace HZExporter.ShaderGraph
             var lowered = refName.ToLowerInvariant();
             prop.IsNormalMap = lowered.Contains("normal") || lowered.Contains("bump");
             prop.IsInlineResource = true;
+            prop.ResourceGuid = slot.ResourceGuid;
             g.Properties.Add(prop);
             g.InlinePropertyBySlotId[slotId] = prop;
         }
@@ -285,6 +305,7 @@ namespace HZExporter.ShaderGraph
                 // read m_Value — that's where the actual graph data lives.
                 if (kv.Value.TryGetValue("m_Value", out var v)) s.Value = v;
                 else if (kv.Value.TryGetValue("m_DefaultValue", out var dv)) s.Value = dv;
+                s.ResourceGuid = ExtractResourceGuid(kv.Value);
 
                 g.Slots[s.Id] = s;
             }

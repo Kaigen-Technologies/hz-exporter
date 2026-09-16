@@ -110,6 +110,17 @@ namespace HZExporter
             return Path.GetFullPath(shaderRootDir);
         }
 
+        /// <summary>Engine-relative asset path prefix for exported assets (e.g. "/unity").
+        /// Engine asset refs are rooted at the project's `assets/` dir, so the configured
+        /// subdir minus its leading `assets/` is exactly that prefix.</summary>
+        public string EngineAssetPrefix()
+        {
+            string sub = string.IsNullOrEmpty(engineAssetsSubdir) ? "assets/unity" : engineAssetsSubdir;
+            sub = sub.Replace('\\', '/').Trim('/');
+            if (sub.StartsWith("assets/")) sub = sub.Substring("assets/".Length);
+            return "/" + sub;
+        }
+
         /// <summary>Absolute engine destination dir, or null when not configured.</summary>
         public string ResolvedEngineDir()
         {

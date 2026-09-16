@@ -142,6 +142,24 @@ public static class HZExportCommands
         Debug.Log($"[HZ-SG] done — {ok} ok, {fail} failed");
     }
 
+    /// <summary>Dump every texture property Unity's compiled shader actually declares,
+    /// so the exporter's names can be checked against ground truth instead of reconstructed.</summary>
+    public static void DumpShaderTextureProperties()
+    {
+        foreach (var shaderName in new[] { "Shader Graphs/CustomLightingBuildingsB_NoLights_LOD" })
+        {
+            var sh = Shader.Find(shaderName);
+            if (sh == null) { Debug.Log($"[HZ-SPROP] {shaderName}: not found"); continue; }
+            int n = sh.GetPropertyCount();
+            for (int i = 0; i < n; i++)
+            {
+                if (sh.GetPropertyType(i) != UnityEngine.Rendering.ShaderPropertyType.Texture) continue;
+                Debug.Log($"[HZ-SPROP] {sh.GetPropertyName(i)}");
+            }
+            Debug.Log($"[HZ-SPROP] done {shaderName}");
+        }
+    }
+
     /// <summary>Emit the `properties` block for every mapped ShaderGraph, derived from the
     /// SAME parse that produces the @material struct, so slot names cannot drift from the
     /// generated fields. Writes Editor/shader_properties.generated.json for merging.</summary>
@@ -174,7 +192,8 @@ public static class HZExportCommands
             {
                 string kind = KindForProperty(prop);
                 if (kind == null) continue;
-                rows.Add($"    {{ \"unity\": \"{prop.ReferenceName}\", \"slot\": \"{prop.FieldName}\", \"kind\": \"{kind}\" }}");
+                string guidPart = string.IsNullOrEmpty(prop.ResourceGuid) ? "" : $", \"guid\": \"{prop.ResourceGuid}\"";
+                rows.Add($"    {{ \"unity\": \"{prop.ReferenceName}\", \"slot\": \"{prop.FieldName}\", \"kind\": \"{kind}\"{guidPart} }}");
             }
             if (first++ > 0) sb.Append(",\n");
             sb.Append($"  \"{shaderName}\": [\n");
@@ -189,7 +208,7 @@ public static class HZExportCommands
         Debug.Log($"[HZ-SP] wrote {outPath} — {shaders} shaders, {props} properties");
     }
 
-    // MaterialFS skips sampler states; cubemaps have no engine material-property path yet.
+    // MaterialFS skips sampler states.
     static string KindForProperty(SgProperty prop)
     {
         if (prop.IsGlobal)
@@ -209,6 +228,7 @@ public static class HZExportCommands
             case SgType.Vec2:      return "vec2";
             case SgType.Vec3:      return "vec3";
             case SgType.Vec4:      return "color4";  // Material.GetColor reads any 4-component property
+            case SgType.TextureCube: return "texture_cube";
             default:               return null;
         }
     }
@@ -1325,6 +1345,40 @@ public static class HZExportCommands
         catch (System.Exception e) { Debug.LogError($"[HZCAP] failed: {e.Message}\n{e.StackTrace}"); }
     }
 
+    /// <summary>Same capture as CaptureTargetScene with the camera's post stack switched off,
+    /// so a grading gap and a lighting gap can be told apart instead of guessed at.</summary>
+    public static void CaptureTargetSceneNoPost()
+    {
+        try
+        {
+            if (!System.IO.File.Exists(CaptureRequestPath)) { Debug.LogError("[HZCAP] failed: no capture request file"); return; }
+            var lines = System.IO.File.ReadAllLines(CaptureRequestPath);
+            string want = lines.Length > 0 ? lines[0].Trim() : "";
+            string outPath = lines.Length > 1 ? lines[1].Trim() : "";
+            int w = lines.Length > 2 && int.TryParse(lines[2].Trim(), out var pw) ? pw : 1920;
+            int h = lines.Length > 3 && int.TryParse(lines[3].Trim(), out var ph) ? ph : 1080;
+            if (string.IsNullOrEmpty(outPath)) { Debug.LogError("[HZCAP] failed: no output path"); return; }
+            if (!string.IsNullOrEmpty(want))
+            {
+                string path = ResolveScenePath(want);
+                if (path == null) { Debug.LogError($"[HZCAP] failed: scene not found '{want}'"); return; }
+                if (!OpenSceneWithSubScenes(path)) { Debug.LogError("[HZCAP] failed: could not open scene"); return; }
+            }
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            var cam = ResolveSceneCamera(scene.GetRootGameObjects());
+            if (cam == null) { Debug.LogError($"[HZCAP] failed: no camera in '{scene.name}'"); return; }
+            var data = cam.GetComponent<UniversalAdditionalCameraData>();
+            bool was = data != null && data.renderPostProcessing;
+            if (data != null) data.renderPostProcessing = false;
+            bool ok = ShootPlain(cam, outPath, w, h);
+            if (data != null) data.renderPostProcessing = was;
+            if (!ok) { Debug.LogError("[HZCAP] failed: render request unsupported"); return; }
+            Debug.Log($"[HZCAP] wrote {outPath} (post off, was={was}) scene='{scene.name}' size={w}x{h}");
+        }
+        catch (System.Exception e) { Debug.LogError($"[HZCAP] failed: {e.Message}\n{e.StackTrace}"); }
+    }
+
+
     static void ShootPlain(Camera cam, string path) => ShootPlain(cam, path, 1920, 1080);
 
     static bool ShootPlain(Camera cam, string path, int w, int h)
@@ -1683,6 +1737,25 @@ public static class HZExportCommands
             pp.mixerBlue = new Vector3(Resolved(cm.blueOutRedIn, d.blueOutRedIn) / 100f, Resolved(cm.blueOutGreenIn, d.blueOutGreenIn) / 100f, Resolved(cm.blueOutBlueIn, d.blueOutBlueIn) / 100f - 1f);
             Object.DestroyImmediate(d);
         }
+        if (profile.TryGet<LiftGammaGain>(out var lgg) && lgg.active)
+        {
+            var d = ScriptableObject.CreateInstance<LiftGammaGain>();
+            pp.lggLift = Resolved(lgg.lift, d.lift);
+            pp.lggGamma = Resolved(lgg.gamma, d.gamma);
+            pp.lggGain = Resolved(lgg.gain, d.gain);
+            Object.DestroyImmediate(d);
+        }
+        if (profile.TryGet<ShadowsMidtonesHighlights>(out var smh) && smh.active)
+        {
+            var d = ScriptableObject.CreateInstance<ShadowsMidtonesHighlights>();
+            pp.smhShadows = Resolved(smh.shadows, d.shadows);
+            pp.smhMidtones = Resolved(smh.midtones, d.midtones);
+            pp.smhHighlights = Resolved(smh.highlights, d.highlights);
+            pp.shaHiLimits = new Vector4(
+                Resolved(smh.shadowsStart, d.shadowsStart), Resolved(smh.shadowsEnd, d.shadowsEnd),
+                Resolved(smh.highlightsStart, d.highlightsStart), Resolved(smh.highlightsEnd, d.highlightsEnd));
+            Object.DestroyImmediate(d);
+        }
         if (profile.TryGet<DepthOfField>(out var dof) && dof.active && dof.mode.overrideState)
         {
             var d = ScriptableObject.CreateInstance<DepthOfField>();
@@ -1707,6 +1780,7 @@ public static class HZExportCommands
                 + $"vignette(int={pp.vignetteIntensity}) tonemap={pp.tonemapMode} "
                 + $"bloom(int={pp.bloomIntensity} thresh={pp.bloomThreshold} scatter={pp.bloomScatter}) "
                 + $"split(sh={pp.splitShadows} hi={pp.splitHighlights} bal={pp.splitBalance}) mixer(r={pp.mixerRed} g={pp.mixerGreen} b={pp.mixerBlue}) "
+                + $"lgg(l={pp.lggLift} g={pp.lggGamma} gn={pp.lggGain}) smh(s={pp.smhShadows} m={pp.smhMidtones} h={pp.smhHighlights} lim={pp.shaHiLimits}) "
                 + $"dof(mode={pp.dofMode} focus={pp.dofFocusDistance} f={pp.dofFocalLength} N={pp.dofAperture} blades={pp.dofBladeCount} q={pp.dofQuality})");
         return pp;
     }

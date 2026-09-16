@@ -1489,6 +1489,9 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
             int to   = ReadInt(node, "m_Conversion", "to");
             int kind = 0;
             if (node.Raw.TryGetValue("m_ConversionType", out var ct) && ct is double d) kind = (int)d;
+            // AbsoluteWorld is World without camera-relative rendering, which is the engine's setup
+            if (from == 4) from = 2;
+            if (to == 4) to = 2;
 
             var input = ctx.InputByName(node, "In");
 
@@ -1530,10 +1533,30 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
             // for uniformly-scaled objects (the common case) inverse is fine.
             if (from == 2 && to == 0)
             {
-                if (!ctx.IsVertexStage)
-                    throw new System.NotImplementedException("World→Object transform supported in vertex stage only");
                 string w = (kind == 0) ? "1.0" : "0.0";
-                var rhs = Sg.RawTemplate("(inverse(v.model) * vec4({0}, " + w + ")).xyz", input.Rhs);
+                // the inverse is constant per instance, so @fs reads it from a flat varying
+                // rather than inverting a matrix per pixel
+                string m = ctx.IsVertexStage ? "inverse(v.model)" : "mat4(v_inv_model0, v_inv_model1, v_inv_model2, v_inv_model3)";
+                var rhs = Sg.RawTemplate("(" + m + " * vec4({0}, " + w + ")).xyz", input.Rhs);
+                return ctx.EmitTemp(SgType.Vec3, rhs);
+            }
+
+            // World → Tangent: project onto the TBN basis, the transpose of Tangent → World.
+            if (from == 2 && to == 3 && (kind == 1 || kind == 2))
+            {
+                if (ctx.IsVertexStage)
+                    throw new System.NotImplementedException("World→Tangent transform requires fragment-stage TBN");
+                var rhs = Sg.RawTemplate(
+                    "vec3(dot({0}, v_tangent), dot({0}, cross(v_normal, v_tangent) * v_bitangent_sign), dot({0}, v_normal))",
+                    input.Rhs);
+                return ctx.EmitTemp(SgType.Vec3, rhs);
+            }
+
+            // World → View: the engine keeps the view matrix on the scene uniform.
+            if (from == 2 && to == 1)
+            {
+                string wv = (kind == 0) ? "1.0" : "0.0";
+                var rhs = Sg.RawTemplate("(hz_scene.view * vec4({0}, " + wv + ")).xyz", input.Rhs);
                 return ctx.EmitTemp(SgType.Vec3, rhs);
             }
 
@@ -2189,6 +2212,11 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             // Comparison emitted equality AND failed to compile as a bool. m_ComparisonType
             // order is Unity's: Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual.
             _handlers["ComparisonNode"] = new ComparisonNodeHandler();
+
+            // verbatim from ShaderGraph's NormalReconstructZNode
+            Pattern("NormalReconstructZNode",
+                    v => Sg.RawTemplate("normalize(vec3({0}.x, {0}.y, sqrt(1.0 - clamp(dot({0}.xy, {0}.xy), 0.0, 1.0))))", v[0].Rhs),
+                    _ => SgType.Vec3, "In");
 
             // dot() needs both operands at the same rank; an unwired scalar default
             // would otherwise reach it as dot(vec3, 1.0).

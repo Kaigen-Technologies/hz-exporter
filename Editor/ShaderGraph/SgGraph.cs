@@ -250,6 +250,7 @@ namespace HZExporter.ShaderGraph
         public bool IsOutput;        // m_SlotType: 0=input, 1=output
         public object Value;         // m_Value (preferred over m_DefaultValue — see SgParser)
         public int Space = -1;       // m_Space on Normal/Tangent/Position slots (0 Object, 1 View, 2 World, 3 Tangent, 4 AbsoluteWorld)
+        public string ResourceGuid;  // node-embedded texture/cubemap: the Unity asset guid
 
         // Best-effort mapping from a static slot type to an SgType. Returns
         // Unknown for dynamic slots — those resolve at lowering time.
@@ -328,6 +329,9 @@ namespace HZExporter.ShaderGraph
         public bool IsInlineResource;
         // Value comes from a Unity shader global, read at export time.
         public bool IsGlobal;
+        // Node-embedded resource: the Unity asset guid, used to find the real material
+        // property when Unity's generated name cannot be reconstructed.
+        public string ResourceGuid;
     }
 
     class SgStickyNote

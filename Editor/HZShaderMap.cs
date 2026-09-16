@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -20,6 +21,9 @@ namespace HZExporter
             public string unity;
             public string slot;
             public string kind;
+            // Node-embedded resources: Unity's generated property name cannot be reconstructed
+            // reliably (a subgraph names them after the SubGraphNode), so bind by asset guid.
+            public string guid;
         }
 
         [System.Serializable]
@@ -180,7 +184,59 @@ namespace HZExporter
         }
 
         /// <summary>Force a reload on the next lookup.</summary>
-        public static void Reload() { s_byShader = null; s_customFunctions = null; s_default = null; s_mtime = System.DateTime.MinValue; }
+        public static void Reload() { s_byShader = null; s_customFunctions = null; s_default = null; s_mtime = System.DateTime.MinValue; s_cubemaps.Clear(); s_overrides.Clear(); }
+
+        // One equirect .hdr per distinct source cubemap per editor session: the blit+readback
+        // is the expensive part and hundreds of materials share the same handful of cubemaps.
+        static readonly Dictionary<int, string> s_cubemaps = new Dictionary<int, string>();
+
+        /// <summary>Write a Unity cubemap out as the equirect .hdr + TextureBlobAsset .hzt pair the
+        /// engine's cube texture cook consumes, and return the engine asset path of the .hzt.
+        /// Returns null when the texture is absent or is not cube-dimension.</summary>
+        static string ExportCubemapAsset(Texture cube, string fallbackName)
+        {
+            if (cube == null) return null;
+            if (cube.dimension != UnityEngine.Rendering.TextureDimension.Cube)
+            {
+                Debug.LogWarning($"[HZShaderMap] '{cube.name}' bound to a cubemap slot is {cube.dimension}, not Cube — skipping");
+                return null;
+            }
+            int key = cube.GetInstanceID();
+            if (s_cubemaps.TryGetValue(key, out var cached)) return cached;
+
+            var cfg = HZExporter.HZExporterConfig.Instance;
+            string name = HZGlbWriter.SanitizeName(string.IsNullOrEmpty(cube.name) ? fallbackName : cube.name);
+            string dir = cfg.ResolvedOutputDir() + "/cubemaps";
+            string enginePath = cfg.EngineAssetPrefix() + "/cubemaps/" + name;
+
+            // face_size is fixed at ENV_CUBEMAP_FACE_SIZE on the engine side, so the equirect only
+            // needs enough resolution to feed it: width = 4 * face_size is lossless for that cook.
+            if (!HZSkyboxExporter.ExportCubemap(cube, dir + "/" + name + ".hdr", 1024))
+            {
+                s_cubemaps[key] = null;
+                return null;
+            }
+
+            var hzt = new StringBuilder();
+            hzt.AppendLine("type TextureBlobAsset");
+            hzt.AppendLine("version 21");
+            hzt.AppendLine("---");
+            hzt.AppendLine("image \"" + enginePath + "\" u8");
+            hzt.AppendLine("format TEX_FORMAT_RAW");
+            hzt.AppendLine("width 0");
+            hzt.AppendLine("height 0");
+            hzt.AppendLine("is_srgb false");
+            hzt.AppendLine("has_alpha false");
+            hzt.AppendLine("has_alpha_cutoff false");
+            hzt.AppendLine("max_size 0");
+            hzt.AppendLine("is_cubemap true");
+            File.WriteAllText(dir + "/" + name + ".hzt", hzt.ToString());
+
+            string assetPath = enginePath + ".hzt";
+            s_cubemaps[key] = assetPath;
+            Debug.Log($"[HZShaderMap] exported cubemap '{cube.name}' → {assetPath}");
+            return assetPath;
+        }
 
         /// <summary>All Unity shader names present in shader_mapping.json.</summary>
         public static IEnumerable<string> MappedShaderNames() { EnsureLoaded(); return s_byShader.Keys; }
@@ -202,6 +258,26 @@ namespace HZExporter
             if (mat != null && mat.shader != null && s_byShader.TryGetValue(mat.shader.name, out var e))
                 return EngineShaderExists(e) ? e : s_default;
             return s_default;
+        }
+
+        /// <summary>The material property to read for this mapping entry: its declared name when the
+        /// shader has it, else the texture property holding the same asset guid. null = skip.</summary>
+        static string ResolveTexturePropertyName(Material mat, PropertyMap p)
+        {
+            if (mat.HasProperty(p.unity)) return p.unity;
+            if (string.IsNullOrEmpty(p.guid) || mat.shader == null) return null;
+            int n = mat.shader.GetPropertyCount();
+            for (int i = 0; i < n; i++)
+            {
+                if (mat.shader.GetPropertyType(i) != UnityEngine.Rendering.ShaderPropertyType.Texture) continue;
+                string name = mat.shader.GetPropertyName(i);
+                var tex = mat.GetTexture(name);
+                if (tex == null) continue;
+                string path = AssetDatabase.GetAssetPath(tex);
+                if (string.IsNullOrEmpty(path)) continue;
+                if (AssetDatabase.AssetPathToGUID(path) == p.guid) return name;
+            }
+            return null;
         }
 
         static readonly HashSet<string> s_missingReported = new HashSet<string>();
@@ -250,6 +326,9 @@ namespace HZExporter
             public Vector3 v3;
             public Color c4;
             public int textureIndex;   // index into glTF textures[] (= imageEntries index)
+            // MAT_PROP_TEXTURE only, and it wins over textureIndex: an engine asset path for a
+            // texture the glb does not own (cubemaps cook from a standalone equirect .hdr).
+            public string texturePath;
         }
 
         /// <summary>The full custom-shader material payload that gets serialized into the GLB
@@ -308,9 +387,62 @@ namespace HZExporter
         // already in sRGB (the inspector/gamma value), so those pass through. HDR
         // color props come out of Unity in LINEAR, so re-encode those to sRGB. (Unity
         // is not consistent about which colors it gamma-encodes.)
+        // Material.GetFloat/GetColor return a hardcoded fallback (0 / white) for a property the
+        // material stores no override for, while the GPU is fed the shader's own default. Only
+        // m_SavedProperties says which is which.
+        static readonly Dictionary<int, HashSet<string>> s_overrides = new Dictionary<int, HashSet<string>>();
+
+        static HashSet<string> StoredProperties(Material mat)
+        {
+            int key = mat.GetInstanceID();
+            if (s_overrides.TryGetValue(key, out var cached)) return cached;
+            var set = new HashSet<string>();
+            var so = new SerializedObject(mat);
+            var saved = so.FindProperty("m_SavedProperties");
+            if (saved != null)
+            {
+                string[] buckets = { "m_TexEnvs", "m_Floats", "m_Colors", "m_Ints" };
+                foreach (var b in buckets)
+                {
+                    var arr = saved.FindPropertyRelative(b);
+                    for (int i = 0; arr != null && i < arr.arraySize; i++)
+                    {
+                        var name = arr.GetArrayElementAtIndex(i).FindPropertyRelative("first");
+                        if (name != null && !string.IsNullOrEmpty(name.stringValue)) set.Add(name.stringValue);
+                    }
+                }
+            }
+            s_overrides[key] = set;
+            return set;
+        }
+
+        /// <summary>The float the GPU actually receives: the material's override when it has one,
+        /// otherwise the shader property's own default.</summary>
+        static float ReadFloat(Material mat, string prop)
+        {
+            if (StoredProperties(mat).Contains(prop)) return mat.GetFloat(prop);
+            int idx = mat.shader != null ? mat.shader.FindPropertyIndex(prop) : -1;
+            if (idx < 0) return mat.GetFloat(prop);
+            var t = mat.shader.GetPropertyType(idx);
+            if (t == UnityEngine.Rendering.ShaderPropertyType.Range ||
+                t == UnityEngine.Rendering.ShaderPropertyType.Float)
+                return mat.shader.GetPropertyDefaultFloatValue(idx);
+            return mat.shader.GetPropertyDefaultVectorValue(idx).x;
+        }
+
+        /// <summary>The vector the GPU actually receives (see <see cref="ReadFloat"/>).</summary>
+        static Vector4 ReadVector(Material mat, string prop)
+        {
+            if (StoredProperties(mat).Contains(prop)) return mat.GetVector(prop);
+            int idx = mat.shader != null ? mat.shader.FindPropertyIndex(prop) : -1;
+            if (idx < 0) return mat.GetVector(prop);
+            return mat.shader.GetPropertyDefaultVectorValue(idx);
+        }
+
         static Color ReadColor(Material mat, string prop)
         {
-            Color c = mat.GetColor(prop);
+            Vector4 v = ReadVector(mat, prop);
+            Color c = new Color(v.x, v.y, v.z, v.w);
             if (IsHdrColorProperty(mat, prop))
                 c = new Color(LinearToSrgbF(c.r), LinearToSrgbF(c.g), LinearToSrgbF(c.b), c.a);
             return c;
@@ -642,38 +774,44 @@ namespace HZExporter
                             cm.properties.Add(new CustomProperty { slot = p.slot, kind = "color4", c4 = Shader.GetGlobalColor(p.unity) });
                             break;
                         case "global_texture_cube":
-                            break;   // bound from the cooked cubemap asset, not the glb
+                        {
+                            string cubePath = ExportCubemapAsset(Shader.GetGlobalTexture(p.unity), p.unity);
+                            if (cubePath != null)
+                                cm.properties.Add(new CustomProperty { slot = p.slot, kind = "texture", texturePath = cubePath });
+                            break;
+                        }
                         default:
                             Debug.LogWarning($"[HZShaderMap] unrecognized global kind '{p.kind}' for '{p.unity}'");
                             break;
                     }
                     continue;
                 }
-                if (!mat.HasProperty(p.unity)) continue;
+                string unityName = ResolveTexturePropertyName(mat, p);
+                if (unityName == null) continue;
                 switch (p.kind)
                 {
                     case "float":
-                        cm.properties.Add(new CustomProperty { slot = p.slot, kind = "float", f = mat.GetFloat(p.unity) });
+                        cm.properties.Add(new CustomProperty { slot = p.slot, kind = "float", f = ReadFloat(mat, unityName) });
                         break;
                     case "vec2":
                     {
-                        var v = mat.GetVector(p.unity);
+                        var v = ReadVector(mat, unityName);
                         cm.properties.Add(new CustomProperty { slot = p.slot, kind = "vec2", v2 = new Vector2(v.x, v.y) });
                         break;
                     }
                     case "vec3":
                     {
-                        var v = mat.GetVector(p.unity);
+                        var v = ReadVector(mat, unityName);
                         cm.properties.Add(new CustomProperty { slot = p.slot, kind = "vec3", v3 = new Vector3(v.x, v.y, v.z) });
                         break;
                     }
                     case "color4":
-                        cm.properties.Add(new CustomProperty { slot = p.slot, kind = "color4", c4 = ReadColor(mat, p.unity) });
+                        cm.properties.Add(new CustomProperty { slot = p.slot, kind = "color4", c4 = ReadColor(mat, unityName) });
                         break;
                     case "texture":
                     case "texture_normal":
                     {
-                        var tex = mat.GetTexture(p.unity) as Texture2D;
+                        var tex = mat.GetTexture(unityName) as Texture2D;
                         if (tex == null)
                         {
                             Debug.LogWarning($"[HZShaderMap] '{mat.name}' has no Texture2D bound to '{p.unity}' (slot '{p.slot}') — skipping");
@@ -696,6 +834,17 @@ namespace HZExporter
                             role = -1,
                         });
                         cm.properties.Add(new CustomProperty { slot = p.slot, kind = "texture", textureIndex = idx });
+                        break;
+                    }
+                    case "texture_cube":
+                    {
+                        string cubePath = ExportCubemapAsset(mat.GetTexture(unityName), p.slot);
+                        if (cubePath == null)
+                        {
+                            Debug.LogWarning($"[HZShaderMap] '{mat.name}' has no Cubemap bound to '{p.unity}' (slot '{p.slot}') — skipping");
+                            break;
+                        }
+                        cm.properties.Add(new CustomProperty { slot = p.slot, kind = "texture", texturePath = cubePath });
                         break;
                     }
                     default:
