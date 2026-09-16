@@ -109,6 +109,9 @@ namespace HZExporter
         static ShaderEntry s_default;
         static System.DateTime s_mtime;
 
+        /// <summary>Path of a sibling config file, for tools that write one.</summary>
+        public static string ConfigPathFor(string filename) => GetConfigPath(filename);
+
         static string GetConfigPath(string filename)
         {
             var pkg = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(HZShaderMap).Assembly);
@@ -178,13 +181,32 @@ namespace HZExporter
             return s_byShader.TryGetValue(unityShaderName, out var e) ? e : null;
         }
 
-        /// <summary>Lookup the mapping entry for a material's shader, falling back to the default.</summary>
+        /// <summary>Lookup the mapping entry for a material's shader, falling back to the default.
+        /// A mapped shader whose translation failed has no .hz.glsl on disk; pointing a material at
+        /// it would cook to a dangling shader reference, so those fall back too.</summary>
         public static ShaderEntry Lookup(Material mat)
         {
             EnsureLoaded();
             if (mat != null && mat.shader != null && s_byShader.TryGetValue(mat.shader.name, out var e))
-                return e;
+                return EngineShaderExists(e) ? e : s_default;
             return s_default;
+        }
+
+        static readonly HashSet<string> s_missingReported = new HashSet<string>();
+
+        static bool EngineShaderExists(ShaderEntry e)
+        {
+            if (e == null || string.IsNullOrEmpty(e.engineShader)) return true;
+            string root = HZExporterConfig.Instance.ResolvedShaderRootDir();
+            if (string.IsNullOrEmpty(root)) return true;   // staging-only run; nothing to verify against
+            const string prefix = "/shaders/";
+            if (!e.engineShader.StartsWith(prefix, System.StringComparison.Ordinal)) return true;
+            string full = Path.Combine(root, e.engineShader.Substring(prefix.Length));
+            if (File.Exists(full)) return true;
+            if (s_missingReported.Add(e.unityShader))
+                Debug.LogWarning($"[HZShaderMap] '{e.unityShader}' is mapped to {e.engineShader}, which was not "
+                                 + "translated — materials fall back to the default shader.");
+            return false;
         }
 
         // ---- Material → factors + textures ----

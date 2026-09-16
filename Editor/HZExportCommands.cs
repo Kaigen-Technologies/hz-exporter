@@ -8,6 +8,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using Unity.Scenes;
 using HZExporter;
+using HZExporter.ShaderGraph;
 
 /// <summary>
 /// CLI-callable export commands. Each public static method can be invoked via remote TCP:
@@ -139,6 +140,60 @@ public static class HZExportCommands
             catch (System.Exception e) { Debug.LogError($"[HZ-SG] {System.IO.Path.GetFileName(path)}: {e.Message}\n{e.StackTrace}"); fail++; }
         }
         Debug.Log($"[HZ-SG] done — {ok} ok, {fail} failed");
+    }
+
+    /// <summary>Emit the `properties` block for every mapped ShaderGraph, derived from the
+    /// SAME parse that produces the @material struct, so slot names cannot drift from the
+    /// generated fields. Writes Editor/shader_properties.generated.json for merging.</summary>
+    public static void EmitShaderMappingProperties()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("{\n");
+        int shaders = 0, props = 0, first = 0;
+        foreach (var shaderName in HZShaderMap.MappedShaderNames())
+        {
+            var shader = Shader.Find(shaderName);
+            if (shader == null) continue;
+            string path = AssetDatabase.GetAssetPath(shader);
+            if (!path.EndsWith(".shadergraph", System.StringComparison.OrdinalIgnoreCase)) continue;
+
+            SgGraph graph;
+            try { graph = SgParser.Parse(System.IO.File.ReadAllText(path)); }
+            catch (System.Exception e) { Debug.LogWarning($"[HZ-SP] {shaderName}: {e.Message}"); continue; }
+
+            var rows = new List<string>();
+            foreach (var prop in graph.Properties)
+            {
+                string kind = KindForProperty(prop);
+                if (kind == null) continue;
+                rows.Add($"    {{ \"unity\": \"{prop.ReferenceName}\", \"slot\": \"{prop.FieldName}\", \"kind\": \"{kind}\" }}");
+            }
+            if (first++ > 0) sb.Append(",\n");
+            sb.Append($"  \"{shaderName}\": [\n");
+            sb.Append(string.Join(",\n", rows));
+            sb.Append("\n  ]");
+            shaders++; props += rows.Count;
+        }
+        sb.Append("\n}\n");
+
+        string outPath = HZShaderMap.ConfigPathFor("shader_properties.generated.json");
+        System.IO.File.WriteAllText(outPath, sb.ToString());
+        Debug.Log($"[HZ-SP] wrote {outPath} — {shaders} shaders, {props} properties");
+    }
+
+    // MaterialFS skips sampler states; cubemaps have no engine material-property path yet.
+    static string KindForProperty(SgProperty prop)
+    {
+        switch (prop.Type)
+        {
+            case SgType.Texture2D: return prop.IsNormalMap ? "texture_normal" : "texture";
+            case SgType.Float:     return "float";
+            case SgType.Bool:      return "float";   // stored as float in MaterialFS
+            case SgType.Vec2:      return "vec2";
+            case SgType.Vec3:      return "vec3";
+            case SgType.Vec4:      return "color4";  // Material.GetColor reads any 4-component property
+            default:               return null;
+        }
     }
 
     /// <summary>Directory a translated ShaderGraph must land in so the engine

@@ -1925,6 +1925,33 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             // mat*mat (the operand-order convention also matches Unity's
             // matrix*matrix output, since both pre-multiply column vectors).
             Pattern("MultiplyNode", v => Sg.BinPromote("*", v[0], v[1]), ArithPromote, "A", "B");
+            // --- overrides for generated patterns whose emitted GLSL is ill-typed.
+            // SgGeneratedNodes.cs is machine-written, so the corrections live here (registered
+            // after RegisterAll, so they win) rather than in the generated file.
+            // distance() needs both operands at the same rank; an unwired scalar default would
+            // otherwise reach it as `distance(vec2, 0.0)`.
+            Pattern("DistanceNode", v =>
+            {
+                var t = SgTypes.Promote(v[0].Type, v[1].Type);
+                return Sg.Call("distance",
+                    SgCodegen.CoerceRhsForReturn(v[0].Rhs, v[0].Type, t),
+                    SgCodegen.CoerceRhsForReturn(v[1].Rhs, v[1].Type, t));
+            }, _ => SgType.Float, "A", "B");
+
+            // `bool x = (isnan(y) ? 1 : 0)` does not compile, and WGSL dropped isNan entirely
+            // (Tint reports "unresolved call"), so use the portable IEEE self-comparison.
+            Pattern("IsNanNode", v => Sg.RawTemplate("({0} != {0})", v[0].Rhs), _ => SgType.Bool, "In");
+
+            // A branch's type comes from its two VALUES, not from the predicate, and both sides
+            // must be coerced to it — otherwise a float/vec4 pair emits `float = (c ? 0.0 : vec4)`.
+            Pattern("BranchNode", v =>
+            {
+                var t = SgTypes.Promote(v[1].Type, v[2].Type);
+                return Sg.RawTemplate("({0} ? {1} : {2})", v[0].Rhs,
+                    SgCodegen.CoerceRhsForReturn(v[1].Rhs, v[1].Type, t),
+                    SgCodegen.CoerceRhsForReturn(v[2].Rhs, v[2].Type, t));
+            }, inT => SgTypes.Promote(inT[1], inT[2]), "Predicate", "True", "False");
+
 
             // BlendNode is mode-driven (m_BlendMode) — handled by a custom
             // handler below that reads the mode and emits the per-mode

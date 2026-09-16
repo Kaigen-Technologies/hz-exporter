@@ -207,6 +207,19 @@ namespace HZExporter.ShaderGraph
             return SgType.Unknown;
         }
 
+        // GLSL keywords a snake-cased Unity property name can collide with.
+        static readonly HashSet<string> GlslReserved = new HashSet<string>
+        {
+            "attribute", "bool", "break", "buffer", "bvec2", "bvec3", "bvec4", "case", "centroid",
+            "coherent", "const", "continue", "default", "discard", "do", "double", "dvec2", "dvec3",
+            "dvec4", "else", "false", "flat", "float", "for", "highp", "if", "in", "inout", "int",
+            "invariant", "isampler2D", "ivec2", "ivec3", "ivec4", "layout", "lowp", "mat2", "mat3",
+            "mat4", "mediump", "noperspective", "out", "patch", "precision", "readonly", "restrict",
+            "return", "sample", "sampler2D", "sampler3D", "samplerCube", "shared", "smooth", "struct",
+            "subroutine", "switch", "true", "uint", "uniform", "usampler2D", "uvec2", "uvec3", "uvec4",
+            "varying", "vec2", "vec3", "vec4", "void", "volatile", "while", "writeonly",
+        };
+
         // Field name in MaterialFS — derived from Unity's reference name
         // (`_Color`) by snake-casing (`color`). Falls back to m_Name when no
         // reference name is available.
@@ -215,8 +228,10 @@ namespace HZExporter.ShaderGraph
             string s = !string.IsNullOrEmpty(refName) ? refName : fallback;
             if (string.IsNullOrEmpty(s)) return "_unnamed";
             string field = SgNames.ToSnakeCase(s);
-            // GLSL identifiers cannot start with a digit (e.g. reference "_0_0_1")
-            return field.Length > 0 && char.IsDigit(field[0]) ? "p_" + field : field;
+            // GLSL identifiers cannot start with a digit (e.g. reference "_0_0_1"), and a
+            // property literally named "_Float" would otherwise emit `float float;`
+            if (field.Length > 0 && char.IsDigit(field[0])) return "p_" + field;
+            return GlslReserved.Contains(field) ? "p_" + field : field;
         }
 
         // ----- helpers -------------------------------------------------------
