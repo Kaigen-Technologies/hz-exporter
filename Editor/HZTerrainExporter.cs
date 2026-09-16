@@ -316,7 +316,7 @@ namespace HZExporter
         }
 
         static bool SmoothnessUsesDiffuseAlpha(TerrainLayer l) =>
-            l.smoothnessSource != TerrainLayerSmoothnessSource.ConstantOnly && l.diffuseTexture != null
+            l.smoothnessSource == TerrainLayerSmoothnessSource.DiffuseAlphaChannel && l.diffuseTexture != null
             && UnityEngine.Experimental.Rendering.GraphicsFormatUtility.HasAlphaChannel(l.diffuseTexture.graphicsFormat);
 
         // A layer without a mask map renders in URP TerrainLit with metallic = layer.metallic,
