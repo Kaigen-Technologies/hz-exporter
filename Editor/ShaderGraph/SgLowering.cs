@@ -992,6 +992,94 @@ namespace HZExporter.ShaderGraph
         }
     }
 
+    // RandomRangeNode: Unity_RandomRange, verbatim from ShaderGraph's RandomRangeNode.cs.
+    class RandomRangeNodeHandler : NodeHandler
+    {
+        const string Helper = @"float hz_sg_random_range(vec2 seed, float lo, float hi) {
+    float r = fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
+    return mix(lo, hi, r);
+}";
+
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            ctx.HelperFunctions.Add(("hz_sg_random_range", Helper));
+            var seed = ctx.Input(node.Id, 0);
+            var lo = ctx.Input(node.Id, 1);
+            var hi = ctx.Input(node.Id, 2);
+            return ctx.EmitTemp(SgType.Float, Sg.Call("hz_sg_random_range", seed.Rhs, lo.Rhs, hi.Rhs));
+        }
+    }
+
+    // NoiseNode (Simple Noise), hash type Deterministic = Hash_Tchou_2_1 from
+    // com.unity.render-pipelines.core/ShaderLibrary/Hashes.hlsl. Three octaves,
+    // freq = 2^o and amp = 0.5^(3-o), matching SimpleNoiseNode.cs.
+    class NoiseNodeHandler : NodeHandler
+    {
+        const string Helper = @"float hz_sg_hash_tchou_2_1(vec2 i) {
+    uvec2 v = uvec2(ivec2(round(i)));
+    v.y ^= 1103515245u;
+    v.x += v.y;
+    v.x *= v.y;
+    v.x ^= v.x >> 5u;
+    v.x *= 0x27d4eb2du;
+    return float(v.x >> 8u) * (1.0 / 16777215.0);
+}
+
+float hz_sg_value_noise(vec2 uv) {
+    vec2 i = floor(uv);
+    vec2 f = fract(uv);
+    f = f * f * (3.0 - 2.0 * f);
+    float r0 = hz_sg_hash_tchou_2_1(i + vec2(0.0, 0.0));
+    float r1 = hz_sg_hash_tchou_2_1(i + vec2(1.0, 0.0));
+    float r2 = hz_sg_hash_tchou_2_1(i + vec2(0.0, 1.0));
+    float r3 = hz_sg_hash_tchou_2_1(i + vec2(1.0, 1.0));
+    return mix(mix(r0, r1, f.x), mix(r2, r3, f.x), f.y);
+}
+
+float hz_sg_simple_noise(vec2 uv, float scale) {
+    float o = 0.0;
+    o += hz_sg_value_noise(uv * (scale / 1.0)) * 0.125;
+    o += hz_sg_value_noise(uv * (scale / 2.0)) * 0.25;
+    o += hz_sg_value_noise(uv * (scale / 4.0)) * 0.5;
+    return o;
+}";
+
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            int hash = 0;
+            if (node.Raw.TryGetValue("m_HashType", out var h) && h is double d) hash = (int)d;
+            if (hash != 0)
+                throw new System.NotImplementedException($"NoiseNode hash type {hash} (LegacySine) not supported");
+            ctx.HelperFunctions.Add(("hz_sg_simple_noise", Helper));
+            var uv = ctx.Input(node.Id, 0);
+            var scale = ctx.Input(node.Id, 1);
+            return ctx.EmitTemp(SgType.Float, Sg.Call("hz_sg_simple_noise", uv.Rhs, scale.Rhs));
+        }
+    }
+
+    // ObjectNode: slot 0 Position (object origin in world), 1 Scale. The renderer-bounds
+    // slots (2,3,4) have no engine uniform. Both need the model matrix, so vertex stage only.
+    class ObjectNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            if (outSlotNum >= 2 && outSlotNum <= 4)
+                throw new System.NotImplementedException(
+                    "ObjectNode renderer-bounds outputs have no engine equivalent (no per-draw bounds uniform)");
+            if (!ctx.IsVertexStage)
+                throw new System.NotImplementedException(
+                    "ObjectNode in fragment stage needs a model-matrix varying the templates do not carry");
+            if (outSlotNum == 1)
+                return new SgValue
+                {
+                    Rhs = Sg.Raw("vec3(length(v.model[0].xyz), length(v.model[1].xyz), length(v.model[2].xyz))"),
+                    Type = SgType.Vec3,
+                    IsTemp = false,
+                };
+            return new SgValue { Rhs = Sg.Raw("v.model[3].xyz"), Type = SgType.Vec3, IsTemp = false };
+        }
+    }
+
     // CameraNode: engine camera is always perspective, reverse-Z; width/height/direction have no uniform.
     class CameraNodeHandler : NodeHandler
     {
@@ -1887,6 +1975,9 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             _handlers["RotateAboutAxisNode"]     = new RotateAboutAxisNodeHandler();
             _handlers["RotateNode"]              = new RotateNodeHandler();
             _handlers["FlipbookNode"]            = new FlipbookNodeHandler();
+            _handlers["RandomRangeNode"]         = new RandomRangeNodeHandler();
+            _handlers["NoiseNode"]               = new NoiseNodeHandler();
+            _handlers["ObjectNode"]              = new ObjectNodeHandler();
             _handlers["GradientNode"]            = new GradientNodeHandler();
             _handlers["SampleGradient"]          = new SampleGradientHandler();
             _handlers["RedirectNodeData"]        = new RedirectNodeDataHandler();
