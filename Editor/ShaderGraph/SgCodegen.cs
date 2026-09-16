@@ -120,8 +120,11 @@ namespace HZExporter.ShaderGraph
         {
             public string Symbol;
             public SgType Type;
+            public bool Declare = true;   // false for varyings, declared by the template
             public SgRhs Rhs { get; set; }
-            public string Format() => $"{SgTypes.Glsl(Type)} {Symbol} = {Rhs.ToGlsl()};";
+            public string Format() => Declare
+                ? $"{SgTypes.Glsl(Type)} {Symbol} = {Rhs.ToGlsl()};"
+                : $"{Symbol} = {Rhs.ToGlsl()};";
         }
 
         static string EmitFromTemplate(SgGraph g, string template, bool isLit, bool grass = false)
@@ -132,7 +135,6 @@ namespace HZExporter.ShaderGraph
             string vsPos     = LowerVertexBlock(g, vsCtx, vsAssigns, "Position", "vertex_position", "v.pos");
             string vsNormal  = LowerVertexBlock(g, vsCtx, vsAssigns, "Normal",   "vertex_normal",   "v.normal");
             string vsTangent = LowerVertexBlock(g, vsCtx, vsAssigns, "Tangent",  "vertex_tangent",  "v.tangent");
-            SgOptimize.Run(vsCtx.Statements, vsAssigns);
 
             // ----- fragment stage ------------------------------------------
             var ctx = new LowerCtx(g);
@@ -171,8 +173,17 @@ namespace HZExporter.ShaderGraph
 
             // FormatFunction returns "...}\n"; the extra "\n" makes a blank
             // line between functions and between the last function and main().
+            // @fs gets only the fragment functions: a vertex subgraph takes
+            // VertexInstanceData, which the fragment stage does not declare.
             var functions = new StringBuilder();
-            foreach (var fn in allFunctions) functions.Append(FormatFunction(fn)).Append('\n');
+            var seenFs = new HashSet<string>();
+            foreach (var fn in ctx.Functions)
+                if (seenFs.Add(fn.Name)) functions.Append(FormatFunction(fn)).Append('\n');
+
+            // @vs and @fs are independent compilation units, so a subgraph the VERTEX
+            // stage calls must be defined there too - ${FUNCTIONS} only reaches @fs.
+            var vsFunctions = new StringBuilder();
+            foreach (var fn in vsCtx.Functions) vsFunctions.Append(FormatFunction(fn)).Append('\n');
 
             // Helper functions (e.g. _hz_gradient_noise) — emit per-stage so
             // each compilation unit (`@vs` and `@fs` are independent SPIR-V
@@ -184,6 +195,26 @@ namespace HZExporter.ShaderGraph
             foreach (var h in ctx.HelperFunctions) fsHelpers.Append(h.body).Append("\n\n");
             var vsHelpers = new StringBuilder();
             foreach (var h in vsCtx.HelperFunctions) vsHelpers.Append(h.body).Append("\n\n");
+
+            // custom interpolators: the fragment stage named them, the vertex block computes them
+            string ciOut = "", ciIn = "";
+            foreach (var kv in ctx.RequestedInterpolators)
+            {
+                var ciBlock = g.FindVertexBlockPrefix("VertexDescription." + kv.Key);
+                if (ciBlock == null || ciBlock.SlotByNum.Count == 0)
+                    throw new System.Exception($"custom interpolator '{kv.Key}' has no vertex block");
+                int ciSlot = 0;
+                foreach (var k in ciBlock.SlotByNum.Keys) { ciSlot = k; break; }
+                SgType ciType = kv.Value == 2 ? SgType.Vec2 : kv.Value == 3 ? SgType.Vec3
+                              : kv.Value == 4 ? SgType.Vec4 : SgType.Float;
+                string ciSym = "v_ci_" + SgNames.ToFieldName(kv.Key);
+                var ciVal = vsCtx.Input(ciBlock.Id, ciSlot);
+                vsAssigns.Add(new Assign { Symbol = ciSym, Type = ciType, Declare = false,
+                                           Rhs = CoerceRhs(ciVal.Rhs, ciVal.Type, ciType) });
+                ciOut += "out " + SgTypes.Glsl(ciType) + " " + ciSym + ";" + "\n";
+                ciIn  += "in " + SgTypes.Glsl(ciType) + " " + ciSym + ";" + "\n";
+            }
+            SgOptimize.Run(vsCtx.Statements, vsAssigns);
 
             // ----- format bodies -------------------------------------------
             var vsBody = new StringBuilder();
@@ -226,6 +257,16 @@ namespace HZExporter.ShaderGraph
             var fsDefines = new StringBuilder();
             if (fsScan.Contains("hz_scene_color"))        fsDefines.AppendLine("#define HZ_RENDERER_SCENE_COLOR");
             if (fsScan.Contains("hz_scene_depth_linear")) fsDefines.AppendLine("#define HZ_RENDERER_SCENE_DEPTH");
+            // hz_main_light and calculate_shadow live behind HZ_RENDERER_SHADOWS; the cluster
+            // loop behind HZ_RENDERER_LIGHTING_CLUSTERS, which silently drops point lights when
+            // undefined. The lit template declares these itself; an unlit graph with custom
+            // lighting has to ask.
+            if (fsScan.Contains("hz_main_light") || fsScan.Contains("calculate_shadow"))
+                fsDefines.AppendLine("#define HZ_RENDERER_SHADOWS");
+            if (fsScan.Contains("HZ_CLUSTER_LOOP_BEGIN"))
+                fsDefines.AppendLine("#define HZ_RENDERER_LIGHTING_CLUSTERS");
+            if (fsScan.Contains("hz_apply_fog") || fsScan.Contains("hz_fog_intensity"))
+                fsDefines.AppendLine("#define HZ_RENDERER_FOG");
 
             // The unlit template carries the world-position varying only when the graph reads it
             // (ViewVectorNode / PositionNode in @fs); a vec3 varying on every unlit shader is not free.
@@ -234,6 +275,8 @@ namespace HZExporter.ShaderGraph
             string objScan = fsScan + vsBodyStr;
             bool needsObjPos = objScan.Contains("v_object_world_pos");
             bool needsObjScale = objScan.Contains("v_object_scale");
+            bool needsTangent = objScan.Contains("v_tangent");
+            bool needsBitan = objScan.Contains("v_bitangent_sign");
 
             // Lit graphs that leave Base Color unwired are "implicit unlit" (their
             // output is driven through Emission). Skip the PBR lighting block and
@@ -253,8 +296,16 @@ namespace HZExporter.ShaderGraph
                 .Replace("${MATERIAL_STRUCT}", fsMaterial)
                 .Replace("${VS_MATERIAL}",    vsMaterial)
                 .Replace("${VS_MAT_UNPACK}",  vsMatUnpack)
-                .Replace("${VS_HELPERS}",   vsHelpers.ToString())
+                .Replace("${VS_HELPERS}",   vsHelpers.ToString() + vsFunctions.ToString())
                 .Replace("${HELPERS}",      fsHelpers.ToString())
+                .Replace("${VS_BITAN_OUT}",    needsBitan ? "out float v_bitangent_sign;\n" : "")
+                .Replace("${VS_BITAN_ASSIGN}", needsBitan ? "    v_bitangent_sign = v.bitangent_sign;\n" : "")
+                .Replace("${FS_BITAN_IN}",     needsBitan ? "in float v_bitangent_sign;\n" : "")
+                .Replace("${VS_TANGENT_OUT}",    needsTangent ? "out vec3 v_tangent;\n" : "")
+                .Replace("${VS_TANGENT_ASSIGN}", needsTangent ? "    v_tangent = normalize((v.model * vec4(v.tangent.xyz, 0.0)).xyz);\n" : "")
+                .Replace("${FS_TANGENT_IN}",     needsTangent ? "in vec3 v_tangent;\n" : "")
+                .Replace("${VS_CI_OUT}", ciOut)
+                .Replace("${FS_CI_IN}", ciIn)
                 .Replace("${VS_OBJECT_OUT}",
                          (needsObjPos ? "flat out vec3 v_object_world_pos;\n" : "")
                          + (needsObjScale ? "flat out vec3 v_object_scale;\n" : ""))
@@ -659,7 +710,7 @@ out vec2 v_uv1;
 out vec4 v_color;
 flat out uint v_material_offset;
 out vec3 v_normal;
-${VS_WORLD_POS_OUT}${VS_OBJECT_OUT}#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_OUT}${VS_OBJECT_OUT}${VS_CI_OUT}${VS_TANGENT_OUT}${VS_BITAN_OUT}#ifdef HZ_RENDERER_GBUFFER
 out vec4 v_clip_cur;
 out vec4 v_clip_prev;
 #endif
@@ -674,7 +725,7 @@ ${VS_MAT_UNPACK}${VERTEX_BODY}    vec4 world_pos = v.model * vec4(${VS_POS}, 1.0
     v_color = v.color;
     v_material_offset = v.material_offset;
     v_normal = normalize((v.model * vec4(${VS_NORMAL}, 0.0)).xyz);
-${VS_WORLD_POS_ASSIGN}${VS_OBJECT_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
+${VS_WORLD_POS_ASSIGN}${VS_OBJECT_ASSIGN}${VS_TANGENT_ASSIGN}${VS_BITAN_ASSIGN}#ifdef HZ_RENDERER_GBUFFER
     // jitter-free motion vectors through the previous model; time-driven vertex motion stays camera-only
     v_clip_cur = hz_scene.view_proj_unjittered * world_pos;
     v_clip_prev = hz_scene.prev_view_proj * (unpack_prev_model() * vec4(${VS_POS}, 1.0));
@@ -689,7 +740,7 @@ in vec2 v_uv1;
 in vec4 v_color;
 flat in uint v_material_offset;
 in vec3 v_normal;
-${FS_WORLD_POS_IN}${FS_OBJECT_IN}layout(location = 0) out vec4 frag_color;
+${FS_WORLD_POS_IN}${FS_OBJECT_IN}${FS_CI_IN}${FS_TANGENT_IN}${FS_BITAN_IN}layout(location = 0) out vec4 frag_color;
 ${GBUFFER_FS_OUTPUTS}
 ${MATERIAL_STRUCT}
 ${HELPERS}${FUNCTIONS}void main() {
@@ -704,7 +755,7 @@ ${GBUFFER_FS_WRITES}}
 @"@vs
 #define HZ_RENDERER_LIGHTING_CLUSTERS
 out vec3 v_world_pos;
-${VS_OBJECT_OUT}out vec3 v_object_pos;
+${VS_OBJECT_OUT}${VS_CI_OUT}out vec3 v_object_pos;
 out vec3 v_normal;
 out vec2 v_uv;
 out vec2 v_uv1;
@@ -747,7 +798,7 @@ ${VS_OBJECT_ASSIGN}    v_object_pos = ${VS_POS};
 #define HZ_RENDERER_LIGHTING_CLUSTERS
 #define HZ_RENDERER_FOG
 ${FS_FEATURE_DEFINES}in vec3 v_world_pos;
-${FS_OBJECT_IN}in vec3 v_object_pos;
+${FS_OBJECT_IN}${FS_CI_IN}in vec3 v_object_pos;
 in vec3 v_normal;
 in vec2 v_uv;
 in vec2 v_uv1;
@@ -792,7 +843,7 @@ layout(binding = 2) uniform _DrawParams {
 } hz_draw_params;
 
 out vec3 v_world_pos;
-${VS_OBJECT_OUT}out vec3 v_object_pos;
+${VS_OBJECT_OUT}${VS_CI_OUT}out vec3 v_object_pos;
 out vec3 v_normal;
 out vec2 v_uv;
 out vec2 v_uv1;
@@ -835,7 +886,7 @@ void main() {
 #define HZ_RENDERER_LIGHTING_CLUSTERS
 #define HZ_RENDERER_FOG
 ${FS_FEATURE_DEFINES}in vec3 v_world_pos;
-${FS_OBJECT_IN}in vec3 v_object_pos;
+${FS_OBJECT_IN}${FS_CI_IN}in vec3 v_object_pos;
 in vec3 v_normal;
 in vec2 v_uv;
 in vec2 v_uv1;

@@ -76,6 +76,8 @@ namespace HZExporter.ShaderGraph
         public bool UsesMaterial;
         // Subgraph properties resolved at the call site instead of passed in, keyed by property id.
         public Dictionary<string, SgValue> BoundProperties = new Dictionary<string, SgValue>();
+        // Custom interpolators the fragment stage read, name -> component count.
+        public readonly Dictionary<string, int> RequestedInterpolators = new Dictionary<string, int>();
 
         public SgValue Output(string nodeId, int outSlotNum)
         {
@@ -561,13 +563,17 @@ namespace HZExporter.ShaderGraph
                 ctx.SubGraphCallTemps[node.Id] = entry;
             }
 
+            // A texture output never travelled through the return; take the recorded value.
+            if (entry.fn.TextureOutputs.TryGetValue(SgNames.ToFieldName(requestedSlot.OutputName), out var texOut))
+                return texOut;
+
             // For single-output functions, the call temp IS the value.
             // For multi-output struct-return, swizzle into the field.
             if (entry.fn.StructName == null)
                 return new SgValue { Rhs = entry.temp.Rhs, Type = requestedType, IsTemp = false };
             return new SgValue
             {
-                Rhs = Sg.Swizzle(entry.temp.Rhs, SgNames.ToSnakeCase(requestedSlot.OutputName)),
+                Rhs = Sg.Swizzle(entry.temp.Rhs, SgNames.ToFieldName(requestedSlot.OutputName)),
                 Type = requestedType,
                 IsTemp = false,
             };
@@ -606,6 +612,8 @@ namespace HZExporter.ShaderGraph
             // multi-output, primitive-typed for single-output. Args come from
             // the SubGraphNode's input slots, mapped to subgraph properties.
             var callArgs = ResolveCallArgs(node, sg, ctx);
+            foreach (var pm in fn.Params)
+                if (pm.TypeName == "VertexInstanceData") { callArgs.Insert(0, Sg.Raw("v")); break; }
             if (fn.Params.Count > 0 && fn.Params[0].TypeName == "MaterialFS")
             {
                 ctx.UsesMaterial = true;
@@ -651,6 +659,7 @@ namespace HZExporter.ShaderGraph
             }
 
             var outputs = new List<SgFunctionOutput>();
+            var textureOutputs = new Dictionary<string, SgValue>();
 
             // Iterate the SubGraphNode's slots in their numeric m_Id order so
             // the function's outputs/struct fields match the user's
@@ -669,17 +678,25 @@ namespace HZExporter.ShaderGraph
                     throw new System.Exception($"subgraph {guid} has no output named '{slot.OutputName}'");
 
                 var v = fnCtx.Input(sgOut.Id, sgInSlot);
-                var coerced = SgCodegen.CoerceRhsForReturn(v.Rhs, v.Type, slot.StaticType());
+                var outType = slot.StaticType();
+                if (outType == SgType.Texture2D || outType == SgType.TextureCube)
+                {
+                    textureOutputs[SgNames.ToFieldName(slot.OutputName)] = v;
+                    continue;
+                }
+                var coerced = SgCodegen.CoerceRhsForReturn(v.Rhs, v.Type, outType);
                 outputs.Add(new SgFunctionOutput
                 {
-                    Name = SgNames.ToSnakeCase(slot.OutputName),
-                    Type = slot.StaticType(),
+                    Name = SgNames.ToFieldName(slot.OutputName),
+                    Type = outType,
                     Rhs = coerced,
                 });
             }
 
             // Promote nested SubGraphs' functions into the parent shader.
             ctx.Functions.AddRange(fnCtx.Functions);
+            // ...and their helpers, or a body calls a definition the shader never emits
+            foreach (var h in fnCtx.HelperFunctions) ctx.HelperFunctions.Add(h);
 
             // texture_sample's first argument is a compile-time identifier on non-bindless
             // platforms, so a texture cannot travel as a value — the struct does instead.
@@ -688,9 +705,13 @@ namespace HZExporter.ShaderGraph
                 ctx.UsesMaterial = true;
                 fnParams.Insert(0, new SgFunctionParam { Name = "mat", TypeName = "MaterialFS" });
             }
+            // `v` is a local of the vertex main(); a subgraph reading it needs it passed in
+            if (ctx.IsVertexStage && BodyReadsVertexInstance(fnCtx.Statements, outputs))
+                fnParams.Insert(0, new SgFunctionParam { Name = "v", TypeName = "VertexInstanceData" });
 
             var fn = new SgFunctionDef
             {
+                TextureOutputs = textureOutputs,
                 Name = fnName,
                 StructName = outputs.Count > 1 ? fnName + "_outputs" : null,
                 Params = fnParams,
@@ -699,6 +720,15 @@ namespace HZExporter.ShaderGraph
             };
             ctx.Functions.Add(fn);
             return fn;
+        }
+
+        // Does any emitted statement read the vertex instance struct?
+        static bool BodyReadsVertexInstance(List<SgStatement> body, List<SgFunctionOutput> outs)
+        {
+            var rx = new System.Text.RegularExpressions.Regex(@"(^|[^A-Za-z0-9_])v\.");
+            foreach (var st in body) if (st.Rhs != null && rx.IsMatch(st.Rhs.ToGlsl())) return true;
+            foreach (var o in outs) if (o.Rhs != null && rx.IsMatch(o.Rhs.ToGlsl())) return true;
+            return false;
         }
 
         // Node-embedded resources are declared once on the final shader's MaterialFS.
@@ -1132,6 +1162,92 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
             return ctx.EmitTemp(SgType.Vec4, Sg.RawTemplate(
                 $"texturecube_sample_lod({texRef.FieldName}, mat.{texRef.FieldName}, {{0}}, {{1}})",
                 dir.Rhs, lod.Rhs));
+        }
+    }
+
+    // DropdownNode: a compile-time selector. m_Entries[m_Value].id IS the input slot to read.
+    class DropdownNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            if (!node.Raw.TryGetValue("m_Dropdown", out var dref)
+                || !(dref is Dictionary<string, object> dd)
+                || !dd.TryGetValue("m_Id", out var idObj) || !(idObj is string dropId)
+                || ctx.Graph.RawObjects == null
+                || !ctx.Graph.RawObjects.TryGetValue(dropId, out var drop))
+                throw new Exception("DropdownNode: cannot resolve m_Dropdown");
+
+            int value = drop.TryGetValue("m_Value", out var v) && v is double dv ? (int)dv : 0;
+            if (!drop.TryGetValue("m_Entries", out var eo) || !(eo is List<object> entries) || entries.Count == 0)
+                throw new Exception("DropdownNode: dropdown has no entries");
+            if (value < 0 || value >= entries.Count) value = 0;
+            var entry = entries[value] as Dictionary<string, object>;
+            if (entry == null || !entry.TryGetValue("id", out var eid) || !(eid is double eidD))
+                throw new Exception("DropdownNode: selected entry has no id");
+            return ctx.Input(node.Id, (int)eidD);
+        }
+    }
+
+    // SampleTexture2DLODNode: SampleTexture2D with an explicit mip.
+    // Slots: 0=RGBA, 1=Texture, 2=UV, 3=Sampler, 4=LOD, 5..8=R/G/B/A.
+    class SampleTexture2DLODNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            if (outSlotNum >= 5 && outSlotNum <= 8)
+            {
+                var rgba = ctx.Output(node.Id, 0);
+                string sw = outSlotNum == 5 ? "x" : outSlotNum == 6 ? "y" : outSlotNum == 7 ? "z" : "w";
+                return ctx.EmitTemp(SgType.Float, Sg.Swizzle(rgba.Rhs, sw));
+            }
+            var tex = ctx.Input(node.Id, 1);
+            if (!(tex.Rhs is SgRhsTextureRef texRef))
+                throw new System.NotImplementedException(
+                    "SampleTexture2DLOD: Texture input must come from a Texture2D property");
+            SgRhs uv = ctx.Graph.FindEdgeIntoSlot(node.Id, 2) != null
+                ? ctx.Input(node.Id, 2).Rhs
+                : Sg.Raw("v_uv");
+            var lod = ctx.Input(node.Id, 4);
+            string t = texRef.IsNormalMap
+                ? $"vec4(unpack_normal_bc5(texture_sample_lod({texRef.FieldName}, mat.{texRef.FieldName}, {{0}}, {{1}}).rg) * vec3(1.0, -1.0, 1.0), 1.0)"
+                : $"texture_sample_lod({texRef.FieldName}, mat.{texRef.FieldName}, {{0}}, {{1}})";
+            return ctx.EmitTemp(SgType.Vec4, Sg.RawTemplate(t, uv, lod.Rhs));
+        }
+    }
+
+    // CustomInterpolatorNode: a graph-declared varying. The vertex block of the same name
+    // computes it; this side just reads it, and codegen emits the varying pair.
+    class CustomInterpolatorNodeHandler : NodeHandler
+    {
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            string name = node.Raw.TryGetValue("customBlockNodeName", out var n) ? n as string : null;
+            if (string.IsNullOrEmpty(name))
+                throw new Exception("CustomInterpolatorNode has no customBlockNodeName");
+            int width = node.Raw.TryGetValue("serializedType", out var w) && w is double d ? (int)d : 1;
+            if (ctx.IsVertexStage)
+                throw new NotImplementedException(
+                    $"CustomInterpolatorNode '{name}' read in the vertex stage; it is a varying");
+            ctx.RequestedInterpolators[name] = width;
+            SgType t = width == 2 ? SgType.Vec2 : width == 3 ? SgType.Vec3 : width == 4 ? SgType.Vec4 : SgType.Float;
+            return new SgValue { Rhs = Sg.Raw("v_ci_" + SgNames.ToFieldName(name)), Type = t, IsTemp = false };
+        }
+    }
+
+    class ComparisonNodeHandler : NodeHandler
+    {
+        static readonly string[] Ops = { "==", "!=", "<", "<=", ">", ">=" };
+
+        public override SgValue Lower(SgNode node, int outSlotNum, LowerCtx ctx)
+        {
+            int which = 0;
+            if (node.Raw.TryGetValue("m_ComparisonType", out var c) && c is double d) which = (int)d;
+            if (which < 0 || which >= Ops.Length)
+                throw new NotImplementedException($"ComparisonNode type {which} not supported");
+            var a = ctx.Input(node.Id, 0);
+            var b = ctx.Input(node.Id, 1);
+            return ctx.EmitTemp(SgType.Bool,
+                Sg.RawTemplate("({0} " + Ops[which] + " {1})", a.Rhs, b.Rhs));
         }
     }
 
@@ -1662,23 +1778,35 @@ float hz_sg_simple_noise(vec2 uv, float scale) {
             if (!ctx.Graph.PropertiesById.TryGetValue(propId, out var prop))
                 throw new System.Exception($"PropertyNode references unknown property '{propId}'");
 
+            // a call-site binding wins over the property's own name, or a subgraph would
+            // sample mat.<its own field> instead of the texture the caller passed
+            if (ctx.BoundProperties.TryGetValue(prop.Id, out var boundVal))
+            {
+                // the ref renders as mat.<field>, so this body needs the struct passed in
+                if (boundVal.Rhs is SgRhsTextureRef) ctx.UsesMaterial = true;
+                return boundVal;
+            }
+
             if (prop.Type == SgType.Texture2D || prop.Type == SgType.TextureCube)
+            {
+                ctx.UsesMaterial = true;
                 return new SgValue
                 {
                     Rhs = new SgRhsTextureRef { FieldName = prop.FieldName, IsNormalMap = prop.IsNormalMap },
                     Type = prop.Type,
                     IsTemp = false,
                 };
+            }
 
             // Inside a subgraph, properties are function parameters — emit
             // a bare identifier. Outside (main shader), they're reads of the
             // MaterialFS struct. Bool properties live in the engine struct
             // as `float` (engine constraint) — wrap with `> 0.5` so the
             // value flows back as a real bool.
-            if (ctx.BoundProperties.TryGetValue(prop.Id, out var boundVal)) return boundVal;
-
             string baseExpr = ctx.IsSubGraph ? prop.FieldName : "mat." + prop.FieldName;
-            if (prop.Type == SgType.Bool)
+            // MaterialFS has no bool field, so it stores 0/1 and this decodes it. A subgraph
+            // parameter is already declared bool, and `bool > 0.5` does not compile.
+            if (prop.Type == SgType.Bool && !ctx.IsSubGraph)
                 return new SgValue
                 {
                     Rhs = Sg.Raw("(" + baseExpr + " > 0.5)"),
@@ -2049,6 +2177,27 @@ float _hz_gradient_noise(vec2 uv, float scale) {
                     SgCodegen.CoerceRhsForReturn(v[1].Rhs, v[1].Type, t));
             }, _ => SgType.Float, "A", "B");
 
+            // The generated pattern hardcoded `==` and wrapped it in `? 1 : 0`, so every
+            // Comparison emitted equality AND failed to compile as a bool. m_ComparisonType
+            // order is Unity's: Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual.
+            _handlers["ComparisonNode"] = new ComparisonNodeHandler();
+
+            // dot() needs both operands at the same rank; an unwired scalar default
+            // would otherwise reach it as dot(vec3, 1.0).
+            Pattern("DotProductNode", v => Sg.CallPromote("dot", v[0], v[1]), _ => SgType.Float, "A", "B");
+
+            // GLSL pow needs matching genType; HLSL broadcasts the exponent.
+            Pattern("PowerNode", v => Sg.CallPromote("pow",
+                        new SgValue { Rhs = Sg.RawTemplate("max({0}, 0.0)", v[0].Rhs), Type = v[0].Type },
+                        v[1]),
+                    PromoteAll, "A", "B");
+
+            // OneMinus used raw Bin with SameAsIn, so a bool input emitted `1.0 - <bool>`
+            // typed bool. Route through BinPromote, which coerces bool to its 0/1 float.
+            Pattern("OneMinusNode",
+                    v => Sg.BinPromote("-", new SgValue { Rhs = Sg.Lit(1), Type = SgType.Float }, v[0]),
+                    inT => inT[0] == SgType.Bool ? SgType.Float : inT[0], "In");
+
             // `bool x = (isnan(y) ? 1 : 0)` does not compile, and WGSL dropped isNan entirely
             // (Tint reports "unresolved call"), so use the portable IEEE self-comparison.
             Pattern("IsNanNode", v => Sg.RawTemplate("({0} != {0})", v[0].Rhs), _ => SgType.Bool, "In");
@@ -2117,6 +2266,9 @@ float _hz_gradient_noise(vec2 uv, float scale) {
             _handlers["NoiseNode"]               = new NoiseNodeHandler();
             _handlers["ObjectNode"]              = new ObjectNodeHandler();
             _handlers["SampleRawCubemapNode"]    = new SampleRawCubemapNodeHandler();
+            _handlers["DropdownNode"]            = new DropdownNodeHandler();
+            _handlers["SampleTexture2DLODNode"]  = new SampleTexture2DLODNodeHandler();
+            _handlers["CustomInterpolatorNode"]  = new CustomInterpolatorNodeHandler();
             _handlers["GradientNode"]            = new GradientNodeHandler();
             _handlers["SampleGradient"]          = new SampleGradientHandler();
             _handlers["RedirectNodeData"]        = new RedirectNodeDataHandler();

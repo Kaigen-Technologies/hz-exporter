@@ -189,8 +189,20 @@ namespace HZExporter.ShaderGraph
         {
             string f = ToSnakeCase(s);
             if (f.Length == 0) return "_unnamed";
-            if (char.IsDigit(f[0]) || GlslReserved.Contains(f)) return "p_" + f;
+            if (char.IsDigit(f[0]) || GlslReserved.Contains(f)) f = "p_" + f;
+            // glsl truncates long identifiers, and node-embedded names
+            // (_SampleTexture2D_<32 hex>_Texture_1_Texture2D) collide once cut. Keep a
+            // readable head and make the tail a hash of the FULL name so it stays unique.
+            const int maxLen = 40;
+            if (f.Length > maxLen) f = f.Substring(0, maxLen - 9) + "_" + Fnv1a(s).ToString("x8");
             return f;
+        }
+
+        static uint Fnv1a(string s)
+        {
+            uint h = 2166136261u;
+            foreach (char c in s) { h ^= c; h *= 16777619u; }
+            return h;
         }
 
         public static readonly System.Collections.Generic.HashSet<string> GlslReserved =
@@ -204,6 +216,12 @@ namespace HZExporter.ShaderGraph
             "return", "sample", "sampler2D", "sampler3D", "samplerCube", "shared", "smooth", "struct",
             "subroutine", "switch", "true", "uint", "uniform", "usampler2D", "uvec2", "uvec3", "uvec4",
             "varying", "vec2", "vec3", "vec4", "void", "volatile", "while", "writeonly",
+            // reserved for future use by the GLSL spec; glslang rejects them as identifiers
+            "active", "asm", "cast", "class", "common", "enum", "extern", "external", "filter",
+            "fixed", "goto", "half", "hvec2", "hvec3", "hvec4", "inline", "input", "interface",
+            "long", "namespace", "noinline", "output", "packed", "partition", "public", "resource",
+            "row_major", "sampler1D", "short", "sizeof", "static", "superp", "template", "this",
+            "typedef", "union", "unsigned", "using", "varying", "fvec2", "fvec3", "fvec4",
         };
     }
 
@@ -340,6 +358,8 @@ namespace HZExporter.ShaderGraph
         public List<string> VertexBlockIds = new List<string>();
         public List<string> FragmentBlockIds = new List<string>();
         public Dictionary<string, SgNode> Nodes = new Dictionary<string, SgNode>();
+        // every parsed object by m_ObjectId, for handlers that follow a reference (ShaderDropdown)
+        public Dictionary<string, Dictionary<string, object>> RawObjects;
         public Dictionary<string, SgSlot> Slots = new Dictionary<string, SgSlot>();
         public List<SgEdge> Edges = new List<SgEdge>();
 
@@ -372,6 +392,16 @@ namespace HZExporter.ShaderGraph
         {
             foreach (var id in VertexBlockIds)
                 if (Nodes.TryGetValue(id, out var b) && b.SerializedDescriptor == serializedDescriptor)
+                    return b;
+            return null;
+        }
+
+        // custom interpolator blocks serialize as "VertexDescription.<Name>#<width>"
+        public SgNode FindVertexBlockPrefix(string prefix)
+        {
+            foreach (var id in VertexBlockIds)
+                if (Nodes.TryGetValue(id, out var b) && b.SerializedDescriptor != null
+                    && b.SerializedDescriptor.StartsWith(prefix, System.StringComparison.Ordinal))
                     return b;
             return null;
         }

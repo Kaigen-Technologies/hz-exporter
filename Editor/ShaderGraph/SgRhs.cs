@@ -316,6 +316,9 @@ namespace HZExporter.ShaderGraph
         public List<SgFunctionParam> Params = new List<SgFunctionParam>();
         public List<SgFunctionOutput> Outputs = new List<SgFunctionOutput>();
         public List<SgStatement> Body = new List<SgStatement>();
+        // Texture-typed outputs cannot travel through a return; their value is recorded
+        // here (always a texture ref or a sentinel) and projected at the call site.
+        public Dictionary<string, SgValue> TextureOutputs = new Dictionary<string, SgValue>();
     }
 
     class SgFunctionParam
@@ -363,6 +366,9 @@ namespace HZExporter.ShaderGraph
         // Mat operands fall through to plain Bin (callers handle).
         public static SgRhs BinPromote(string op, SgValue a, SgValue b)
         {
+            // a bool reaching arithmetic is Unity's 0/1; Rank() excludes Bool, so coerce first
+            if (a.Type == SgType.Bool) a = new SgValue { Rhs = Call("float", a.Rhs), Type = SgType.Float };
+            if (b.Type == SgType.Bool) b = new SgValue { Rhs = Call("float", b.Rhs), Type = SgType.Float };
             int ra = SgTypes.Rank(a.Type), rb = SgTypes.Rank(b.Type);
             if (ra > 0 && rb > 0 && ra != rb)
             {
@@ -401,10 +407,15 @@ namespace HZExporter.ShaderGraph
             else
             {
                 string sw = "xyzw".Substring(0, minRank);
+                string ctor = "vec" + minRank;
                 for (int i = 0; i < vs.Length; i++)
                 {
                     int r = SgTypes.Rank(vs[i].Type);
-                    args[i] = r > minRank ? Swizzle(vs[i].Rhs, sw) : vs[i].Rhs;
+                    // HLSL broadcasts a scalar into a genType slot; GLSL wants it spelled out,
+                    // or mix(float, vec3, float) reaches the compiler unmatched.
+                    args[i] = r > minRank ? Swizzle(vs[i].Rhs, sw)
+                            : r == 1 ? Call(ctor, vs[i].Rhs)
+                            : vs[i].Rhs;
                 }
             }
             return new SgRhsCall { Func = fn, Args = new List<SgRhs>(args) };

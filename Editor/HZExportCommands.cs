@@ -158,7 +158,15 @@ public static class HZExportCommands
             if (!path.EndsWith(".shadergraph", System.StringComparison.OrdinalIgnoreCase)) continue;
 
             SgGraph graph;
-            try { graph = SgParser.Parse(System.IO.File.ReadAllText(path)); }
+            try
+            {
+                graph = SgParser.Parse(System.IO.File.ReadAllText(path));
+                // globals, hoisted node-embedded resources and cubemaps are declared during
+                // LOWERING, so the properties are only complete once codegen has run.
+                graph.IsGrassCapable = HZGrassShaders.IsCapable(
+                    System.IO.Path.GetFileNameWithoutExtension(path), null);
+                SgCodegen.Emit(graph, System.IO.Path.GetFileNameWithoutExtension(path));
+            }
             catch (System.Exception e) { Debug.LogWarning($"[HZ-SP] {shaderName}: {e.Message}"); continue; }
 
             var rows = new List<string>();

@@ -24,6 +24,7 @@ namespace HZExporter.ShaderGraph
             }
 
             var g = new SgGraph();
+            g.RawObjects = raw;
             var graphData = FindGraphData(raw);
 
             ResolveVariant(g, raw, graphData);
