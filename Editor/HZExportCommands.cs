@@ -1647,7 +1647,20 @@ public static class HZExportCommands
         return quality == SoftShadowQuality.Low ? 2u : 3u;
     }
 
-    static float ActiveShadowDistance()
+    /// <summary>True when the scene shadows its far field with something other than URP's cascades.
+    /// Detected from the live component, not the _OrthographicShadowActive global: that global is
+    /// published from OnEnable, which has not run in a freshly opened editor scene.</summary>
+    static bool HasFarFieldShadowSystem()
+    {
+        foreach (var mb in Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (mb == null || !mb.enabled) continue;
+            if (mb.GetType().Name == "OrthographicShadow") return true;
+        }
+        return false;
+    }
+
+    static float UrpShadowDistance()
     {
         var rp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline;
         if (rp != null)
@@ -1657,6 +1670,30 @@ public static class HZExportCommands
                 return (float)prop.GetValue(rp);
         }
         return QualitySettings.shadowDistance;
+    }
+
+    /// <summary>What Unity actually shadows, which is not always URP's shadowDistance. A scene may
+    /// cover the far field with a second system (Megacity bakes an orthographic shadow map and
+    /// publishes _OrthographicShadow* globals); the engine has one cascaded system, so exporting
+    /// only URP's near distance leaves every distant surface unshadowed.</summary>
+    static float ActiveShadowDistance()
+    {
+        float urpDistance = UrpShadowDistance();
+        if (!HasFarFieldShadowSystem()) return urpDistance;
+        var cam = Camera.main;
+        float far = cam != null ? cam.farClipPlane : urpDistance;
+        return Mathf.Max(urpDistance, far);
+    }
+
+    /// <summary>URP's cascade count is tuned for its own shadowDistance. When ActiveShadowDistance
+    /// extends well past it, that many cascades would smear the near field, so widen the split.</summary>
+    static void WidenCascadesForExtendedDistance(ref uint count, ref Vector3 splits)
+    {
+        if (!HasFarFieldShadowSystem()) return;
+        if (ActiveShadowDistance() <= UrpShadowDistance() * 1.5f) return;
+        if (count >= 4) return;
+        count = 4;
+        splits = new Vector3(0.02f, 0.08f, 0.25f);
     }
 
     // Read the scene's URP post-processing Volume into engine EcsPostProcessing values. Picks the
@@ -2619,6 +2656,9 @@ public static class HZExportCommands
                 RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Skybox ? 0f : 1.0f;
             var shadowAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
             ResolveShadowLayout(shadowAsset, out uint cascadeCount, out Vector3 cascadeSplits);
+            WidenCascadesForExtendedDistance(ref cascadeCount, ref cascadeSplits);
+            Debug.Log($"[HZshadow] farField={HasFarFieldShadowSystem()} urpDistance={UrpShadowDistance():F1} "
+                    + $"exported={ActiveShadowDistance():F1} cascades={cascadeCount} splits={cascadeSplits}");
             // Unity FogMode: Linear=1, Exponential=2, ExponentialSquared=3 — same numbers as RendererFogMode.
             uint fogMode = RenderSettings.fog ? (uint)RenderSettings.fogMode : 0u;
             // RenderSettings.fogColor already comes back in the space the engine
