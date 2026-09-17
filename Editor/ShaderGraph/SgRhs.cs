@@ -26,6 +26,9 @@ namespace HZExporter.ShaderGraph
         public static SgConst Vec(SgType t, params double[] vs) =>
             new SgConst { Type = t, Values = vs };
 
+        public static SgConst Bool(bool v) =>
+            new SgConst { Type = SgType.Bool, Values = new[] { v ? 1.0 : 0.0 } };
+
         public bool IsFinite()
         {
             foreach (var v in Values)
@@ -35,6 +38,7 @@ namespace HZExporter.ShaderGraph
 
         public string ToGlsl()
         {
+            if (Type == SgType.Bool) return Values[0] != 0.0 ? "true" : "false";
             if (Type == SgType.Float) return SgTypes.FormatFloat(Values[0]);
             var parts = new string[Values.Length];
             for (int i = 0; i < Values.Length; i++) parts[i] = SgTypes.FormatFloat(Values[i]);

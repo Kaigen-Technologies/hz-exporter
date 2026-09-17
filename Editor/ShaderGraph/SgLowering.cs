@@ -344,6 +344,17 @@ namespace HZExporter.ShaderGraph
         static bool TryParseConst(object value, SgType t, out SgConst c)
         {
             c = default;
+            // a BooleanMaterialSlot default arrives as a JSON bool; without this every boolean
+            // slot in every graph fell through to Zero(t) and translated as false
+            if (value is bool bv)
+            {
+                switch (t)
+                {
+                    case SgType.Bool:  c = SgConst.Bool(bv); return true;
+                    case SgType.Float: c = SgConst.Scalar(bv ? 1.0 : 0.0); return true;
+                }
+                return false;
+            }
             if (value is double d)
             {
                 switch (t)

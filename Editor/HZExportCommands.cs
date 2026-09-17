@@ -877,6 +877,38 @@ public static class HZExportCommands
 
     /// <summary>Write Unity's own generated shader for the Vegetation graph, so the
     /// translation is checked against what URP actually compiles, not the graph JSON.</summary>
+    /// <summary>Write the HLSL ShaderGraph actually compiles for each .shadergraph listed in
+    /// UserSettings/HzDumpShader.txt, so a translation can be diffed against the real thing
+    /// instead of inferred from how it renders.</summary>
+    public static void DumpGeneratedShader()
+    {
+        const string req = "UserSettings/HzDumpShader.txt";
+        if (!System.IO.File.Exists(req)) { Debug.LogError($"[HZGS] no {req}"); return; }
+        var asm = System.Type.GetType("UnityEditor.ShaderGraph.ShaderGraphImporter, Unity.ShaderGraph.Editor").Assembly;
+        var importer = asm.GetType("UnityEditor.ShaderGraph.ShaderGraphImporter");
+        var assetsT = asm.GetType("UnityEditor.ShaderGraph.AssetCollection");
+        System.Reflection.MethodInfo getText = null;
+        foreach (var m in importer.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public))
+            if (m.Name == "GetShaderText" && m.GetParameters().Length == 4) getText = m;
+        if (getText == null || assetsT == null) { Debug.LogError("[HZGS] GetShaderText not found"); return; }
+        string outDir = OutputDir + "/generated_shaders";
+        System.IO.Directory.CreateDirectory(outDir);
+        foreach (var line in System.IO.File.ReadAllLines(req))
+        {
+            string graph = line.Trim();
+            if (graph.Length == 0) continue;
+            try
+            {
+                var args = new object[] { graph, null, System.Activator.CreateInstance(assetsT, true), null };
+                var text = (string)getText.Invoke(null, args);
+                string outPath = outDir + "/" + System.IO.Path.GetFileNameWithoutExtension(graph) + ".generated.shader";
+                System.IO.File.WriteAllText(outPath, text);
+                Debug.Log($"[HZGS] wrote {outPath} ({text.Length} chars)");
+            }
+            catch (System.Exception e) { Debug.LogError($"[HZGS] {graph}: {e.Message}"); }
+        }
+    }
+
     public static void DumpVegetationGeneratedShader()
     {
         const string graph = "Assets/Idyllic Fantasy Nature/Shader/Vegetation.shadergraph";
