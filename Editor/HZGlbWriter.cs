@@ -1842,7 +1842,8 @@ namespace HZExporter
                         if (!string.IsNullOrEmpty(p.texturePath))
                             json.Append("\"type\": \"MAT_PROP_TEXTURE\", \"texture_path\": \"" + EscapeJson(p.texturePath) + "\" }");
                         else
-                            json.Append("\"type\": \"MAT_PROP_TEXTURE\", \"texture_index\": " + p.textureIndex + " }");
+                            json.Append("\"type\": \"MAT_PROP_TEXTURE\", \"texture_index\": " + p.textureIndex
+                                      + (p.textureLinear ? ", \"texture_linear\": true" : "") + " }");
                         break;
                     default:
                         json.Append("\"type\": \"MAT_PROP_UNKNOWN\" }");
@@ -1980,12 +1981,15 @@ namespace HZExporter
         }
 
         // Returns PNG bytes for the given texture asset, computing+caching on first touch.
-        internal static byte[] EncodeAndCachePng(Texture2D src, bool isNormal)
+        internal static byte[] EncodeAndCachePng(Texture2D src, bool isNormal) =>
+            EncodeAndCachePng(src, isNormal, isNormal);
+
+        internal static byte[] EncodeAndCachePng(Texture2D src, bool isNormal, bool linear)
         {
-            var key = new TexCacheKey { instanceId = src.GetInstanceID(), isNormal = isNormal };
+            var key = new TexCacheKey { instanceId = src.GetInstanceID(), isNormal = isNormal || linear };
             if (s_pngCache.TryGetValue(key, out var cached)) return cached;
 
-            var readable = MakeReadable(src, isNormal);
+            var readable = MakeReadable(src, isNormal, linear);
             byte[] png = readable.EncodeToPNG();
             if (readable != src) UnityEngine.Object.DestroyImmediate(readable);
             s_pngCache[key] = png;
@@ -2008,12 +2012,14 @@ namespace HZExporter
             return png;
         }
 
-        internal static Texture2D MakeReadable(Texture2D src, bool isNormalMap = false)
+        internal static Texture2D MakeReadable(Texture2D src, bool isNormalMap = false, bool linear = false)
         {
             if (isNormalMap)
                 return MakeReadableNormalMap(src);
             if (src.isReadable) return src;
-            RenderTexture tmp = RenderTexture.GetTemporary(src.width, src.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.sRGB);
+            // blitting a linear source through an sRGB target bakes a gamma curve into the bytes
+            RenderTexture tmp = RenderTexture.GetTemporary(src.width, src.height, 0, RenderTextureFormat.Default,
+                                                          linear ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB);
             Graphics.Blit(src, tmp);
             RenderTexture prev = RenderTexture.active;
             RenderTexture.active = tmp;

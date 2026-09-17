@@ -329,6 +329,7 @@ namespace HZExporter
             // MAT_PROP_TEXTURE only, and it wins over textureIndex: an engine asset path for a
             // texture the glb does not own (cubemaps cook from a standalone equirect .hdr).
             public string texturePath;
+            public bool textureLinear;  // Unity sRGBTexture == false: sampled as data
         }
 
         /// <summary>The full custom-shader material payload that gets serialized into the GLB
@@ -439,6 +440,18 @@ namespace HZExporter
             return mat.shader.GetPropertyDefaultVectorValue(idx);
         }
 
+        /// <summary>Unity's own sRGB import flag for a texture asset. A packed data texture
+        /// (normal.xy + AO + mask) is linear without being a two-channel normal map, so the
+        /// property kind cannot stand in for this.</summary>
+        static bool IsLinearTexture(Texture tex)
+        {
+            if (tex == null) return false;
+            string path = AssetDatabase.GetAssetPath(tex);
+            if (string.IsNullOrEmpty(path)) return false;
+            var ti = AssetImporter.GetAtPath(path) as TextureImporter;
+            return ti != null && !ti.sRGBTexture;
+        }
+
         static Color ReadColor(Material mat, string prop)
         {
             Vector4 v = ReadVector(mat, prop);
@@ -532,7 +545,8 @@ namespace HZExporter
                         int role = SlotToRole(p.slot);
                         if (role < 0) break;
                         bool isNormal = p.kind == "texture_normal";
-                        byte[] png = HZGlbWriter.EncodeAndCachePng(tex, isNormal);
+                        bool linear = isNormal || IsLinearTexture(tex);
+                        byte[] png = HZGlbWriter.EncodeAndCachePng(tex, isNormal, linear);
                         HZGlbWriter.PadTo4(bin);
                         int off = (int)bin.Position;
                         bin.Write(png, 0, png.Length);
@@ -823,7 +837,8 @@ namespace HZExporter
                         // the shader's [0,1]→[-1,1] decode produces meaningless
                         // perturbations. Plain textures stay sRGB.
                         bool isNormal = p.kind == "texture_normal";
-                        byte[] png = HZGlbWriter.EncodeAndCachePng(tex, isNormal);
+                        bool linear = isNormal || IsLinearTexture(tex);
+                        byte[] png = HZGlbWriter.EncodeAndCachePng(tex, isNormal, linear);
                         HZGlbWriter.PadTo4(bin);
                         int off = (int)bin.Position;
                         bin.Write(png, 0, png.Length);
@@ -833,7 +848,7 @@ namespace HZExporter
                             name = HZGlbWriter.SanitizeName(tex.name ?? p.slot),
                             role = -1,
                         });
-                        cm.properties.Add(new CustomProperty { slot = p.slot, kind = "texture", textureIndex = idx });
+                        cm.properties.Add(new CustomProperty { slot = p.slot, kind = "texture", textureIndex = idx, textureLinear = linear });
                         break;
                     }
                     case "texture_cube":
