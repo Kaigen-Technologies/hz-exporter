@@ -8,6 +8,11 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using Unity.Scenes;
 using HZExporter;
+#if UNITY_6000_3_OR_NEWER
+using HzObjectId = UnityEngine.EntityId;
+#else
+using HzObjectId = System.Int32;
+#endif
 
 /// <summary>
 /// CLI-callable export commands. Each public static method can be invoked via remote TCP:
@@ -1876,18 +1881,18 @@ public static class HZExportCommands
         System.IO.Directory.CreateDirectory(sceneOutDir);
 
         // Map from GameObject instance ID to stable ID for parent references
-        var goToStableId = new Dictionary<int, ulong>();
+        var goToStableId = new Dictionary<HzObjectId, ulong>();
 
         // First pass: assign stable IDs to all GameObjects via GlobalObjectId hash
         foreach (var root in roots)
             foreach (var t in root.GetComponentsInChildren<Transform>(true))
-                goToStableId[t.gameObject.GetInstanceID()] = StableIdFor(t.gameObject);
+                goToStableId[t.gameObject.HzId()] = StableIdFor(t.gameObject);
 
         // Collect GameObjects to skip: skeleton bones owned by each Animator. A nested Animator
         // (e.g. an attached separate skinned model) is its OWN character — its GO stays exportable
         // and its bones are skipped only by its own pass, not by an outer Animator's pass. So we
         // walk each Animator's descendants and stop at any deeper Animator boundary.
-        var skipGOs = new HashSet<int>();
+        var skipGOs = new HashSet<HzObjectId>();
         foreach (var root in roots)
         {
             foreach (var animator in root.GetComponentsInChildren<Animator>(true))
@@ -1902,7 +1907,7 @@ public static class HZExportCommands
         // the placeholder itself has no renderer and would export as an empty entity.
         foreach (var root in roots)
             foreach (var ss in root.GetComponentsInChildren<SubScene>(true))
-                skipGOs.Add(ss.gameObject.GetInstanceID());
+                skipGOs.Add(ss.gameObject.HzId());
 
         // LODGroup: keep LOD0's renderer(s) as base entities; skip every renderer that
         // belongs only to LOD1+. Build lodExtrasByBaseGO so the entity-emission pass can
@@ -1917,7 +1922,7 @@ public static class HZExportCommands
         //
         // lodExtrasByBaseGO: key = LOD0 renderer's GameObject instanceID,
         //                   value = ordered list of {Renderer rdr, float switch_coverage}.
-        var lodExtrasByBaseGO = new Dictionary<int, List<(Renderer rdr, float switchCoverage)>>();
+        var lodExtrasByBaseGO = new Dictionary<HzObjectId, List<(Renderer rdr, float switchCoverage)>>();
         foreach (var root in roots)
         {
             foreach (var lodGroup in root.GetComponentsInChildren<LODGroup>(true))
@@ -1938,9 +1943,9 @@ public static class HZExportCommands
                     continue;
                 }
 
-                var baseKeepIds = new HashSet<int>();
+                var baseKeepIds = new HashSet<HzObjectId>();
                 foreach (var r in lods[0].renderers)
-                    if (r != null) baseKeepIds.Add(r.gameObject.GetInstanceID());
+                    if (r != null) baseKeepIds.Add(r.gameObject.HzId());
 
                 var extras = new List<(Renderer, float)>();
                 for (int li = 1; li < lods.Length; li++)
@@ -1960,14 +1965,14 @@ public static class HZExportCommands
                     foreach (var r in lods[li].renderers)
                     {
                         if (r == null) continue;
-                        var id = r.gameObject.GetInstanceID();
+                        var id = r.gameObject.HzId();
                         if (!baseKeepIds.Contains(id)) skipGOs.Add(id);
                     }
                 }
 
                 if (extras.Count > 0)
                 {
-                    var baseId = baseRdr.gameObject.GetInstanceID();
+                    var baseId = baseRdr.gameObject.HzId();
                     lodExtrasByBaseGO[baseId] = extras;
                 }
             }
@@ -1994,7 +1999,7 @@ public static class HZExportCommands
         // "is my Unity ancestor a bone of the outer character that owns me?" in O(1) per ancestor.
         // Only includes bones whose nearest Animator IS this Animator (so a deeper Animator's
         // bones don't pollute its parent's set).
-        var bonesByAnimator = new Dictionary<int, HashSet<Transform>>(); // animator GO entityID → bones
+        var bonesByAnimator = new Dictionary<HzObjectId, HashSet<Transform>>(); // animator GO entityID → bones
         foreach (var rGo in roots)
         {
             foreach (var anim in rGo.GetComponentsInChildren<Animator>(true))
@@ -2007,7 +2012,7 @@ public static class HZExportCommands
                     foreach (var b in smr.bones)
                         if (b != null) set.Add(b);
                 }
-                bonesByAnimator[anim.gameObject.GetInstanceID()] = set;
+                bonesByAnimator[anim.gameObject.HzId()] = set;
             }
         }
 
@@ -2041,9 +2046,9 @@ public static class HZExportCommands
                 var go = t.gameObject;
 
                 // Skip skeleton bones and SMR children of skinned roots
-                if (skipGOs.Contains(go.GetInstanceID())) continue;
+                if (skipGOs.Contains(go.HzId())) continue;
 
-                ulong stableId = goToStableId[go.GetInstanceID()];
+                ulong stableId = goToStableId[go.HzId()];
 
                 // Find nearest exported ancestor (skip skeleton bones)
                 ulong parentStableId = 0;
@@ -2051,7 +2056,7 @@ public static class HZExportCommands
                 Transform ancestor = t.parent;
                 while (ancestor != null)
                 {
-                    var ancestorId = ancestor.gameObject.GetInstanceID();
+                    var ancestorId = ancestor.gameObject.HzId();
                     if (!skipGOs.Contains(ancestorId) && goToStableId.TryGetValue(ancestorId, out ulong pid))
                     {
                         parentStableId = pid;
@@ -2068,7 +2073,7 @@ public static class HZExportCommands
                 // bones[] set, that's our bone anchor.
                 Transform boneAnchor = null;
                 if (parentAnchor != null && t.parent != null
-                    && bonesByAnimator.TryGetValue(parentAnchor.gameObject.GetInstanceID(), out var ownerBones)
+                    && bonesByAnimator.TryGetValue(parentAnchor.gameObject.HzId(), out var ownerBones)
                     && ownerBones != null && ownerBones.Count > 0)
                 {
                     for (Transform a = t.parent; a != null && a != parentAnchor; a = a.parent)
@@ -2238,7 +2243,7 @@ public static class HZExportCommands
                     var td = terrain.terrainData;
                     string tdPath = AssetDatabase.GetAssetPath(td);
                     string terrainKey = string.IsNullOrEmpty(tdPath)
-                        ? "tid:" + td.GetInstanceID()
+                        ? "tid:" + td.HzId()
                         : tdPath;
                     if (!exportedTerrains.TryGetValue(terrainKey, out string terrainRef))
                     {
@@ -2289,7 +2294,7 @@ public static class HZExportCommands
 
                     // If this renderer is the base (LOD0) of a LODGroup, export each
                     // extra LOD's mesh as a model asset and attach as extra_lods.
-                    if (lodExtrasByBaseGO.TryGetValue(go.GetInstanceID(), out var extras))
+                    if (lodExtrasByBaseGO.TryGetValue(go.HzId(), out var extras))
                     {
                         info.extraLods = new List<(string, float)>(extras.Count);
                         foreach (var (lodRdr, switchCov) in extras)
@@ -2564,7 +2569,7 @@ public static class HZExportCommands
             var m = mats[i];
             if (m == null) { parts[i] = "null"; continue; }
             string ap = AssetDatabase.GetAssetPath(m);
-            parts[i] = !string.IsNullOrEmpty(ap) ? ap : $"iid:{m.GetInstanceID()}";
+            parts[i] = !string.IsNullOrEmpty(ap) ? ap : $"iid:{m.HzId()}";
         }
         return string.Join("|", parts);
     }
@@ -2717,7 +2722,7 @@ public static class HZExportCommands
     static void CollectTreeEntities(GameObject[] roots, UnityEngine.SceneManagement.Scene scene,
         List<HZSceneExporter.EntityExportInfo> entities, GlbExportCache exportedGlbs)
     {
-        var protoCache = new Dictionary<int, TreeProtoModel>();
+        var protoCache = new Dictionary<HzObjectId, TreeProtoModel>();
         foreach (var root in roots)
             foreach (var terrain in root.GetComponentsInChildren<Terrain>(true))
             {
@@ -2737,7 +2742,7 @@ public static class HZExportCommands
                     var prefab = protos[ti.prototypeIndex].prefab;
                     if (prefab == null) continue;
 
-                    var key = prefab.GetInstanceID();
+                    var key = prefab.HzId();
                     if (!protoCache.TryGetValue(key, out var pm))
                     {
                         pm = ExportTreePrototype(prefab, exportedGlbs);
@@ -2760,7 +2765,7 @@ public static class HZExportCommands
                         extraLods = pm.extraLods != null && pm.extraLods.Count > 0
                             ? new List<(string, float)>(pm.extraLods) : null,
                         parentStableId = 0,
-                        stableId = StableIdForString($"{scene.path}::tree::{terrain.GetInstanceID()}::{i}"),
+                        stableId = StableIdForString($"{scene.path}::tree::{terrain.HzId()}::{i}"),
                     });
                     count++;
                 }
@@ -2778,7 +2783,7 @@ public static class HZExportCommands
         if (tex == null) return null;
 
         string srcPath = AssetDatabase.GetAssetPath(tex);
-        string key = !string.IsNullOrEmpty(srcPath) ? srcPath : $"iid:{tex.GetInstanceID()}";
+        string key = !string.IsNullOrEmpty(srcPath) ? srcPath : $"iid:{tex.HzId()}";
         if (exportedGrassAlbedos.TryGetValue(key, out string cached))
             return cached;
 
@@ -3052,13 +3057,13 @@ public static class HZExportCommands
     /// Stops at any deeper Animator boundary — that subtree belongs to a nested character
     /// and is processed by its own pass. The owner's GO itself is NOT added (caller responsibility).
     /// </summary>
-    static void AddBoneSkips(Transform cur, GameObject ownerAnim, HashSet<int> skipGOs)
+    static void AddBoneSkips(Transform cur, GameObject ownerAnim, HashSet<HzObjectId> skipGOs)
     {
         for (int i = 0; i < cur.childCount; i++)
         {
             var child = cur.GetChild(i);
             if (child.GetComponent<Animator>() != null) continue; // nested character — its own pass
-            skipGOs.Add(child.gameObject.GetInstanceID());
+            skipGOs.Add(child.gameObject.HzId());
             AddBoneSkips(child, ownerAnim, skipGOs);
         }
     }

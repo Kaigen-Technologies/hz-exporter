@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
+#if UNITY_6000_3_OR_NEWER
+using HzObjectId = UnityEngine.EntityId;
+#else
+using HzObjectId = System.Int32;
+#endif
 
 //
 namespace HZExporter
@@ -1952,7 +1957,7 @@ namespace HZExporter
 
         struct TexCacheKey : IEquatable<TexCacheKey>
         {
-            public int instanceId;
+            public HzObjectId instanceId;
             public bool isNormal;
             public bool Equals(TexCacheKey o) => instanceId == o.instanceId && isNormal == o.isNormal;
             public override bool Equals(object o) => o is TexCacheKey k && Equals(k);
@@ -1962,8 +1967,8 @@ namespace HZExporter
 
         struct OrmCacheKey : IEquatable<OrmCacheKey>
         {
-            public int metalSmoothId; // default when null
-            public int occlusionId;   // default when null
+            public HzObjectId metalSmoothId; // default when null
+            public HzObjectId occlusionId;   // default when null
             public bool Equals(OrmCacheKey o) => metalSmoothId == o.metalSmoothId && occlusionId == o.occlusionId;
             public override bool Equals(object o) => o is OrmCacheKey k && Equals(k);
             public override int GetHashCode() => metalSmoothId.GetHashCode() * 31 + occlusionId.GetHashCode();
@@ -1979,7 +1984,7 @@ namespace HZExporter
         // Returns PNG bytes for the given texture asset, computing+caching on first touch.
         internal static byte[] EncodeAndCachePng(Texture2D src, bool isNormal)
         {
-            var key = new TexCacheKey { instanceId = src.GetInstanceID(), isNormal = isNormal };
+            var key = new TexCacheKey { instanceId = src.HzId(), isNormal = isNormal };
             if (s_pngCache.TryGetValue(key, out var cached)) return cached;
 
             var readable = MakeReadable(src, isNormal);
@@ -1992,8 +1997,8 @@ namespace HZExporter
         internal static byte[] EncodeAndCacheOrmPng(Texture2D metallicGloss, Texture2D occlusion)
         {
             var key = new OrmCacheKey {
-                metalSmoothId = metallicGloss != null ? metallicGloss.GetInstanceID() : default,
-                occlusionId = occlusion != null ? occlusion.GetInstanceID() : default,
+                metalSmoothId = metallicGloss != null ? metallicGloss.HzId() : default,
+                occlusionId = occlusion != null ? occlusion.HzId() : default,
             };
             if (s_ormPngCache.TryGetValue(key, out var cached)) return cached;
 
