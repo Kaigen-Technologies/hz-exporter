@@ -72,7 +72,7 @@ namespace HZExporter
             if (root == null) return names;
             var valid = new HashSet<Renderer>(validRenderers ?? new Renderer[0]);
             HZGlbWriter.ResetJointNames();
-            // The set of joints the model export actually emits (the primary SMR's non-null bones,
+            // The set of joints the model export actually emits (every SMR's non-null bones,
             // by HZGlbWriter.ExportJointName — the same strings the GLB nodes carry). Cloth bone_names and collider
             // bone_names MUST be members; the engine resolves by exact string match and silently
             // nukes a whole cloth on one miss.
@@ -107,16 +107,15 @@ namespace HZExporter
         // (the same "primary" the GLB skeleton is built from), keyed by exported joint name.
         static HashSet<string> JointSetFor(Renderer[] renderers)
         {
+            // Every SMR's bones, as HZGlbWriter unions them into the skeleton. A single SMR is not
+            // enough: meshes can carry partial bone lists (Juniper's hair SMR has the head but no
+            // chest/arms), which dropped every body collider.
             var set = new HashSet<string>();
-            SkinnedMeshRenderer primary = null;
             if (renderers != null)
                 foreach (var r in renderers)
-                    if (r is SkinnedMeshRenderer s && s.bones != null &&
-                        (primary == null || s.bones.Length > primary.bones.Length))
-                        primary = s;
-            if (primary != null)
-                foreach (var b in primary.bones)
-                    if (b != null) set.Add(HZGlbWriter.ExportJointName(b));
+                    if (r is SkinnedMeshRenderer s && s.bones != null && s.sharedMesh != null)
+                        foreach (var b in s.bones)
+                            if (b != null) set.Add(HZGlbWriter.ExportJointName(b));
             return set;
         }
 
