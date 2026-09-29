@@ -697,7 +697,8 @@ namespace HZExporter
 
         public static void ExportSkinnedMesh(SkinnedMeshRenderer[] smrs, Material[][] materialsPerSmr,
             SkinnedMeshRenderer primarySmr, Transform entityRoot, string outputPath,
-            AnimClipInfo[] animClips = null, string assetNameScope = null)
+            AnimClipInfo[] animClips = null, string assetNameScope = null,
+            List<KeyValuePair<string, Material>> materialsOut = null)
         {
             ResetJointNames();
             // The engine cook writes glb materials/images to one flat, name-keyed dir, so two
@@ -1508,6 +1509,7 @@ namespace HZExporter
                 // Skinned materials get a `_skinned` suffix so the cooked material is identifiable
                 // as the skinned variant (mirrors the `_grass` naming for grass meshes).
                 string smatName = scopePrefix + SanitizeName(materials[mi2]?.name ?? $"material_{mi2}") + "_skinned";
+                materialsOut?.Add(new KeyValuePair<string, Material>(smatName, materials[mi2]));
                 if (skinnedCustomMats[mi2] != null)
                 {
                     WriteCustomMaterialJson(json, smatName, skinnedCustomMats[mi2]);
@@ -1983,7 +1985,7 @@ namespace HZExporter
 
         static string EscapeJson(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
-        internal static string SanitizeName(string name) =>
+        public static string SanitizeName(string name) =>
             (name ?? "").Replace(" ", "_").Replace("/", "_").Replace("\\", "_");
 
         // FBX merges prefix blendshape names like "Face__merged__2_blendShape.Fcl_ALL_Neutral".

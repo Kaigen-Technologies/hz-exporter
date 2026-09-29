@@ -2016,27 +2016,7 @@ public static class HZExportCommands
             }
         }
 
-        // Pose every rig at "idle frame 0" before sampling entity transforms. The FBX bind
-        // pose is sometimes degenerate (e.g. tail rig collapsed at the floor) — what the user
-        // sees in Unity when the Animator runs is the idle animation, which puts everything
-        // at its expected visual rest position. Sample the first AnimationClip at t=0 of each
-        // Animator to reproduce that pose deterministically.
-        foreach (var rootGO in roots)
-        {
-            foreach (var animator in rootGO.GetComponentsInChildren<Animator>(true))
-            {
-                if (animator.runtimeAnimatorController == null) continue;
-                var clips = animator.runtimeAnimatorController.animationClips;
-                if (clips == null || clips.Length == 0) continue;
-                AnimationClip first = null;
-                foreach (var c in clips)
-                {
-                    if (c == null || c.name.StartsWith("__preview__")) continue;
-                    first = c; break;
-                }
-                if (first != null) first.SampleAnimation(animator.gameObject, 0f);
-            }
-        }
+        PoseRigsAtIdle(roots);
 
         // Second pass: export each GameObject as an entity.
         foreach (var root in roots)
@@ -2134,105 +2114,31 @@ public static class HZExportCommands
                 // *deeper* Animator (a nested attached character) are filtered out — they get
                 // exported when we visit that nested Animator's GO as its own entity.
                 var thisAnimator = go.GetComponent<Animator>();
-                var allSmrs = go.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-                var validSmrs = new List<SkinnedMeshRenderer>();
-                foreach (var s in allSmrs)
-                    if (s.sharedMesh != null && s.bones != null && s.bones.Length > 0
-                        && NearestAnimator(s.transform) == thisAnimator)
-                        validSmrs.Add(s);
-
-                if (validSmrs.Count > 0 && thisAnimator != null)
+                if (thisAnimator != null && CollectSkinnedCharacter(thisAnimator, deferredSkinned,
+                        out string charName, out var validSmrs, out var primarySmr))
                 {
-                    SkinnedMeshRenderer primarySmr = validSmrs[0];
-                    foreach (var s in validSmrs)
-                        if (s.bones.Length > primarySmr.bones.Length)
-                            primarySmr = s;
-
-                    // Character name = FBX filename with @... stripped
-                    string charName = GetCharacterName(primarySmr.sharedMesh);
-                    string glbAssetPath = $"{AssetPrefix}/glb/{charName}.glb";
-
-                    // Defer export — collect mesh info on first encounter
-                    if (!deferredSkinned.ContainsKey(charName))
-                    {
-                        var smrArray = validSmrs.ToArray();
-                        // sharedMaterials[] preserves multi-material SMRs (one per submesh).
-                        var mats = new Material[validSmrs.Count][];
-                        for (int si = 0; si < validSmrs.Count; si++)
-                            mats[si] = validSmrs[si].sharedMaterials;
-
-                        deferredSkinned[charName] = new DeferredSkinnedExport {
-                            smrs = smrArray,
-                            materials = mats,
-                            primarySmr = primarySmr,
-                            entityRoot = go.transform,
-                            glbPath = $"{OutputDir}/glb/{charName}.glb",
-                            glbAssetPath = glbAssetPath,
-                            animClips = new List<HZGlbWriter.AnimClipInfo>(),
-                        };
-                    }
-
-                    info.modelAssetPath = glbAssetPath;
+                    var deferred = deferredSkinned[charName];
+                    info.modelAssetPath = deferred.glbAssetPath;
                     info.bounds = primarySmr.bounds;
                     info.castsShadow = true;
 
-                    // Collect animation clips for this character
-                    var animator = go.GetComponent<Animator>();
-                    if (animator.runtimeAnimatorController != null)
+                    if (thisAnimator.runtimeAnimatorController != null && deferred.animClips.Count > 0)
                     {
-                        var deferred = deferredSkinned[charName];
-                        var existingNames = new HashSet<string>();
-                        foreach (var existing in deferred.animClips)
-                            existingNames.Add(existing.name);
-
-                        foreach (var clip in animator.runtimeAnimatorController.animationClips)
-                        {
-                            string clipName = SanitizeName(clip.name);
-                            if (!existingNames.Contains(clipName))
-                            {
-                                deferred.animClips.Add(new HZGlbWriter.AnimClipInfo {
-                                    clip = clip,
-                                    name = clipName,
-                                    skeletonRoot = go,
-                                });
-                                existingNames.Add(clipName);
-                            }
-                        }
-
-                        if (deferred.animClips.Count > 0)
-                        {
-                            // Point to the cooked animation .hza that the engine extracts from the GLB
-                            // Engine cooks unity/SeaGull.glb → cooked/unity/SeaGull/{clipName}.hza
-                            string firstClipName = SanitizeName(animator.runtimeAnimatorController.animationClips[0].name);
-                            info.animationAssetPath = $"{AssetPrefix}/glb/{charName}/{firstClipName}.hza";
-                        }
+                        // Point to the cooked animation .hza that the engine extracts from the GLB
+                        // Engine cooks unity/SeaGull.glb → cooked/unity/SeaGull/{clipName}.hza
+                        string firstClipName = SanitizeName(thisAnimator.runtimeAnimatorController.animationClips[0].name);
+                        info.animationAssetPath = $"{AssetPrefix}/glb/{charName}/{firstClipName}.hza";
                     }
 
-                    if (HZClothIntegration.ExportMeshCloths != null)
+                    var clothRefs = ExportCharacterCloths(go, validSmrs, SanitizeName(scene.name), charName, out _);
+                    if (clothRefs.Count > 0)
                     {
-                        // MeshCloth authoring → per-character cloth blobs + EcsClothRefs.
-                        // Namespaced by character (scene/<char>/cloth) so two characters with
-                        // same-named cloths (e.g. both "skirt") don't collide on one flat file.
-                        string clothSceneNm = SanitizeName(scene.name);
-                        string clothOutDir = $"{OutputDir}/{clothSceneNm}/{charName}/cloth";
-                        string clothAssetPrefix = $"{AssetPrefix}/{clothSceneNm}/{charName}/cloth";
-                        var clothFiles = HZClothIntegration.ExportMeshCloths(go, validSmrs.ToArray(), clothOutDir);
-                        const int ECS_CLOTH_MAX_PER_MODEL = 24;
-                        if (clothFiles.Count > ECS_CLOTH_MAX_PER_MODEL)
-                        {
-                            Debug.LogWarning($"[HZExport] {go.name}: {clothFiles.Count} MeshCloths exceeds " +
-                                             $"ECS_CLOTH_MAX_PER_MODEL ({ECS_CLOTH_MAX_PER_MODEL}); extra cloths dropped");
-                            clothFiles = clothFiles.GetRange(0, ECS_CLOTH_MAX_PER_MODEL);
-                        }
-                        if (clothFiles.Count > 0)
-                        {
-                            var csb = new System.Text.StringBuilder();
-                            csb.AppendLine("component EcsClothRefs");
-                            csb.AppendLine($"  cloths {clothFiles.Count}");
-                            foreach (var fn in clothFiles)
-                                csb.AppendLine($"    cloth {clothAssetPrefix}/{fn} ClothAuthoringBlobAsset");
-                            AddCustom(ref info, csb.ToString());
-                        }
+                        var csb = new System.Text.StringBuilder();
+                        csb.AppendLine("component EcsClothRefs");
+                        csb.AppendLine($"  cloths {clothRefs.Count}");
+                        foreach (var cref in clothRefs)
+                            csb.AppendLine($"    cloth {cref} ClothAuthoringBlobAsset");
+                        AddCustom(ref info, csb.ToString());
                     }
                 }
                 // Terrain — export the TerrainData (heightmap + splatmaps + layer textures)
@@ -2376,35 +2282,8 @@ public static class HZExportCommands
             }
         }
 
-        // Map a timeline-bound Animator → the character key in deferredSkinned (by SMR membership),
-        // so timeline clips can be fed into the right character's GLB. Null when unbound/unmatched.
-        System.Func<Animator, string> resolveChar = anim =>
-        {
-            if (anim == null) return null;
-            var set = new HashSet<SkinnedMeshRenderer>(anim.GetComponentsInChildren<SkinnedMeshRenderer>(true));
-            foreach (var kv in deferredSkinned)
-                foreach (var s in kv.Value.smrs)
-                    if (set.Contains(s)) return kv.Key;
-            return null;
-        };
-        // Add timeline AnimationTrack clips to the matching character's GLB anim set (dedup by name)
-        // so they get baked + cooked alongside the controller clips, BEFORE the GLB export below.
-        HZEmoteExporter.CollectTimelineClips(roots, resolveChar, (charName, clip) =>
-        {
-            if (!deferredSkinned.TryGetValue(charName, out var d)) return;
-            string nm = SanitizeName(clip.name);
-            if (d.animClips.Any(a => a.name == nm)) return;
-            d.animClips.Add(new HZGlbWriter.AnimClipInfo { clip = clip, name = nm, skeletonRoot = d.entityRoot.gameObject });
-        });
-
-        // Export deferred skinned meshes (with collected animations)
-        foreach (var kvp in deferredSkinned)
-        {
-            var d = kvp.Value;
-            var animArray = d.animClips.Count > 0 ? d.animClips.ToArray() : null;
-            HZGlbWriter.ExportSkinnedMesh(d.smrs, d.materials, d.primarySmr, d.entityRoot, d.glbPath, animArray,
-                assetNameScope: kvp.Key);
-        }
+        var resolveChar = CharacterResolver(deferredSkinned);
+        ExportDeferredSkinned(roots, deferredSkinned, resolveChar, null);
 
         // Timelines → EmoteBlobAsset .hzt (paths point at the just-baked GLB anims).
         HZEmoteExporter.Export(roots, resolveChar, OutputDir, AssetPrefix);
@@ -2531,6 +2410,227 @@ public static class HZExportCommands
 
         if (HZExporter.HZExporterConfig.Instance.autoCopyOnExport)
             CopyToEngine();
+    }
+
+    /// <summary>One skinned character written by ExportSceneCharacters (staging-dir outputs).</summary>
+    public class SceneCharacterExport
+    {
+        public string name;              // model name (FBX name, @... stripped)
+        public GameObject root;          // the GO with the Animator
+        public string glbPath;           // staging file
+        public string glbAssetPath;      // engine asset path (unity/glb/<name>.glb)
+        public string clothDir;          // staging dir of the cloth blobs (null without cloth integration)
+        public List<string> clothAssetPaths = new List<string>();
+        public List<KeyValuePair<string, Material>> materials = new List<KeyValuePair<string, Material>>(); // GLB order
+    }
+
+    /// <summary>
+    /// The skinned half of ExportScene: every character in the loaded scenes → GLB + cloth blobs in
+    /// the staging dir. No scene chunk, environment, emotes or engine copy; the caller copies.
+    /// </summary>
+    public static List<SceneCharacterExport> ExportSceneCharacters()
+    {
+        HZGlbWriter.ResetTextureCache();
+        var scene = SceneManager.GetActiveScene();
+        var roots = GetAllLoadedRoots();
+        PoseRigsAtIdle(roots);
+
+        var skipGOs = new HashSet<HzObjectId>();
+        foreach (var root in roots)
+            foreach (var animator in root.GetComponentsInChildren<Animator>(true))
+                AddBoneSkips(animator.transform, animator.gameObject, skipGOs);
+
+        var deferredSkinned = new Dictionary<string, DeferredSkinnedExport>();
+        var results = new List<SceneCharacterExport>();
+        foreach (var root in roots)
+            foreach (var animator in root.GetComponentsInChildren<Animator>(true))
+            {
+                if (skipGOs.Contains(animator.gameObject.HzId())) continue;
+                if (!CollectSkinnedCharacter(animator, deferredSkinned, out string charName, out var smrs, out _)) continue;
+                if (results.Any(r => r.name == charName)) continue;
+                var res = new SceneCharacterExport
+                {
+                    name = charName,
+                    root = animator.gameObject,
+                    glbPath = deferredSkinned[charName].glbPath,
+                    glbAssetPath = deferredSkinned[charName].glbAssetPath,
+                };
+                string sceneNm = SanitizeName(scene.name);
+                string clothDir = $"{OutputDir}/{sceneNm}/{charName}/cloth";
+                if (System.IO.Directory.Exists(clothDir)) System.IO.Directory.Delete(clothDir, true);
+                res.clothAssetPaths = ExportCharacterCloths(animator.gameObject, smrs, sceneNm, charName, out res.clothDir);
+                results.Add(res);
+            }
+
+        var materials = new Dictionary<string, List<KeyValuePair<string, Material>>>();
+        ExportDeferredSkinned(roots, deferredSkinned, CharacterResolver(deferredSkinned), materials);
+        foreach (var res in results)
+            res.materials = materials[res.name];
+        Debug.Log($"[HZ] Character export done: {results.Count} character(s)");
+        return results;
+    }
+
+    /// <summary>
+    /// Pose every rig at "idle frame 0" before sampling transforms. The FBX bind pose is
+    /// sometimes degenerate (e.g. tail rig collapsed at the floor) — what the user sees in Unity
+    /// when the Animator runs is the idle animation. Sample the first clip at t=0 of each Animator.
+    /// </summary>
+    static void PoseRigsAtIdle(GameObject[] roots)
+    {
+        foreach (var rootGO in roots)
+        {
+            foreach (var animator in rootGO.GetComponentsInChildren<Animator>(true))
+            {
+                if (animator.runtimeAnimatorController == null) continue;
+                var clips = animator.runtimeAnimatorController.animationClips;
+                if (clips == null || clips.Length == 0) continue;
+                AnimationClip first = null;
+                foreach (var c in clips)
+                {
+                    if (c == null || c.name.StartsWith("__preview__")) continue;
+                    first = c; break;
+                }
+                if (first != null) first.SampleAnimation(animator.gameObject, 0f);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The skinned character rooted at `animator`: records it in `deferred` on first sight and
+    /// merges its controller clips. SMRs that belong to a *deeper* Animator (a nested attached
+    /// character) are left to that Animator. False when it has no skinned mesh.
+    /// </summary>
+    static bool CollectSkinnedCharacter(Animator animator, Dictionary<string, DeferredSkinnedExport> deferredSkinned,
+        out string charName, out SkinnedMeshRenderer[] smrs, out SkinnedMeshRenderer primarySmr)
+    {
+        var validSmrs = new List<SkinnedMeshRenderer>();
+        foreach (var s in animator.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            if (s.sharedMesh != null && s.bones != null && s.bones.Length > 0
+                && NearestAnimator(s.transform) == animator)
+                validSmrs.Add(s);
+        charName = null; smrs = null; primarySmr = null;
+        if (validSmrs.Count == 0) return false;
+
+        primarySmr = validSmrs[0];
+        foreach (var s in validSmrs)
+            if (s.bones.Length > primarySmr.bones.Length)
+                primarySmr = s;
+        smrs = validSmrs.ToArray();
+
+        // Character name = FBX filename with @... stripped
+        charName = GetCharacterName(primarySmr.sharedMesh);
+        if (!deferredSkinned.ContainsKey(charName))
+        {
+            // sharedMaterials[] preserves multi-material SMRs (one per submesh).
+            var mats = new Material[smrs.Length][];
+            for (int si = 0; si < smrs.Length; si++)
+                mats[si] = smrs[si].sharedMaterials;
+
+            deferredSkinned[charName] = new DeferredSkinnedExport {
+                smrs = smrs,
+                materials = mats,
+                primarySmr = primarySmr,
+                entityRoot = animator.transform,
+                glbPath = $"{OutputDir}/glb/{charName}.glb",
+                glbAssetPath = $"{AssetPrefix}/glb/{charName}.glb",
+                animClips = new List<HZGlbWriter.AnimClipInfo>(),
+            };
+        }
+
+        // Collect animation clips for this character
+        if (animator.runtimeAnimatorController != null)
+        {
+            var deferred = deferredSkinned[charName];
+            var existingNames = new HashSet<string>();
+            foreach (var existing in deferred.animClips)
+                existingNames.Add(existing.name);
+
+            foreach (var clip in animator.runtimeAnimatorController.animationClips)
+            {
+                string clipName = SanitizeName(clip.name);
+                if (!existingNames.Contains(clipName))
+                {
+                    deferred.animClips.Add(new HZGlbWriter.AnimClipInfo {
+                        clip = clip,
+                        name = clipName,
+                        skeletonRoot = animator.gameObject,
+                    });
+                    existingNames.Add(clipName);
+                }
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// MeshCloth authoring → per-character cloth blobs. Namespaced by character
+    /// (&lt;scene&gt;/&lt;char&gt;/cloth) so two characters with same-named cloths (e.g. both "skirt")
+    /// don't collide on one flat file. Returns the engine asset paths; empty (and clothDir null)
+    /// without the cloth integration.
+    /// </summary>
+    static List<string> ExportCharacterCloths(GameObject go, SkinnedMeshRenderer[] smrs, string sceneName,
+        string charName, out string clothDir)
+    {
+        var refs = new List<string>();
+        clothDir = null;
+        if (HZClothIntegration.ExportMeshCloths == null) return refs;
+        clothDir = $"{OutputDir}/{sceneName}/{charName}/cloth";
+        string clothAssetPrefix = $"{AssetPrefix}/{sceneName}/{charName}/cloth";
+        var clothFiles = HZClothIntegration.ExportMeshCloths(go, smrs, clothDir);
+        const int ECS_CLOTH_MAX_PER_MODEL = 24;
+        if (clothFiles.Count > ECS_CLOTH_MAX_PER_MODEL)
+        {
+            Debug.LogWarning($"[HZExport] {go.name}: {clothFiles.Count} MeshCloths exceeds " +
+                             $"ECS_CLOTH_MAX_PER_MODEL ({ECS_CLOTH_MAX_PER_MODEL}); extra cloths dropped");
+            clothFiles = clothFiles.GetRange(0, ECS_CLOTH_MAX_PER_MODEL);
+        }
+        foreach (var fn in clothFiles)
+            refs.Add($"{clothAssetPrefix}/{fn}");
+        return refs;
+    }
+
+    /// <summary>
+    /// Map a timeline-bound Animator → the character key in deferredSkinned (by SMR membership),
+    /// so timeline clips can be fed into the right character's GLB. Null when unbound/unmatched.
+    /// </summary>
+    static System.Func<Animator, string> CharacterResolver(Dictionary<string, DeferredSkinnedExport> deferredSkinned)
+    {
+        return anim =>
+        {
+            if (anim == null) return null;
+            var set = new HashSet<SkinnedMeshRenderer>(anim.GetComponentsInChildren<SkinnedMeshRenderer>(true));
+            foreach (var kv in deferredSkinned)
+                foreach (var s in kv.Value.smrs)
+                    if (set.Contains(s)) return kv.Key;
+            return null;
+        };
+    }
+
+    /// <summary>
+    /// Adds timeline AnimationTrack clips to the matching character's anim set (dedup by name),
+    /// then writes each character's GLB. materialsOut (optional) receives each GLB's material list.
+    /// </summary>
+    static void ExportDeferredSkinned(GameObject[] roots, Dictionary<string, DeferredSkinnedExport> deferredSkinned,
+        System.Func<Animator, string> resolveChar,
+        Dictionary<string, List<KeyValuePair<string, Material>>> materialsOut)
+    {
+        HZEmoteExporter.CollectTimelineClips(roots, resolveChar, (charName, clip) =>
+        {
+            if (!deferredSkinned.TryGetValue(charName, out var d)) return;
+            string nm = SanitizeName(clip.name);
+            if (d.animClips.Any(a => a.name == nm)) return;
+            d.animClips.Add(new HZGlbWriter.AnimClipInfo { clip = clip, name = nm, skeletonRoot = d.entityRoot.gameObject });
+        });
+
+        foreach (var kvp in deferredSkinned)
+        {
+            var d = kvp.Value;
+            var animArray = d.animClips.Count > 0 ? d.animClips.ToArray() : null;
+            List<KeyValuePair<string, Material>> mats = null;
+            if (materialsOut != null) materialsOut[kvp.Key] = mats = new List<KeyValuePair<string, Material>>();
+            HZGlbWriter.ExportSkinnedMesh(d.smrs, d.materials, d.primarySmr, d.entityRoot, d.glbPath, animArray,
+                assetNameScope: kvp.Key, materialsOut: mats);
+        }
     }
 
     struct DeferredSkinnedExport

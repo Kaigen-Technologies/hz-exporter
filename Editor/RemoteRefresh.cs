@@ -18,6 +18,7 @@ using UnityEditor; // AssemblyReloadEvents
 ///   "log"      — returns last compilation result
 ///   "ping"     — returns "pong"
 ///   "exec:Type.Method" — runs a static method on the main thread
+///   "exec:Type.Method:arg" — same, passing everything after the second ':' as one string
 /// </summary>
 [InitializeOnLoad]
 public static class RemoteRefresh
@@ -215,6 +216,9 @@ public static class RemoteRefresh
             s_execMethod = null;
             try
             {
+                string arg = null;
+                int colon = method.IndexOf(':');
+                if (colon >= 0) { arg = method.Substring(colon + 1); method = method.Substring(0, colon); }
                 int dot = method.LastIndexOf('.');
                 if (dot < 0) { Debug.LogError($"[RemoteRefresh] Invalid method: {method}"); return; }
                 string typeName = method.Substring(0, dot);
@@ -231,8 +235,12 @@ public static class RemoteRefresh
                 var mi = type.GetMethod(methodName, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
                 if (mi == null) { Debug.LogError($"[RemoteRefresh] Method not found: {method}"); return; }
 
-                Debug.Log($"[RemoteRefresh] Executing {method}...");
-                mi.Invoke(null, null);
+                var ps = mi.GetParameters();
+                bool takesArg = ps.Length == 1 && ps[0].ParameterType == typeof(string);
+                if (ps.Length != 0 && !takesArg) { Debug.LogError($"[RemoteRefresh] {method} must take no args or one string"); return; }
+                if (arg != null && !takesArg) { Debug.LogError($"[RemoteRefresh] {method} takes no argument (got '{arg}')"); return; }
+                Debug.Log($"[RemoteRefresh] Executing {method}{(arg != null ? $"({arg})" : "")}...");
+                mi.Invoke(null, takesArg ? new object[] { arg } : null);
             }
             catch (System.Exception ex)
             {
