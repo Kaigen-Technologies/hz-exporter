@@ -71,8 +71,9 @@ namespace HZExporter
             var names = new List<string>();
             if (root == null) return names;
             var valid = new HashSet<Renderer>(validRenderers ?? new Renderer[0]);
+            HZGlbWriter.ResetJointNames();
             // The set of joints the model export actually emits (the primary SMR's non-null bones,
-            // by raw bone.name — the same strings the GLB nodes carry). Cloth bone_names and collider
+            // by HZGlbWriter.ExportJointName — the same strings the GLB nodes carry). Cloth bone_names and collider
             // bone_names MUST be members; the engine resolves by exact string match and silently
             // nukes a whole cloth on one miss.
             var jointSet = JointSetFor(validRenderers);
@@ -82,7 +83,7 @@ namespace HZExporter
             // in-engine and every chain keeps its full length. Without this the
             // chains are short a segment and the new leaf bones freeze.
             foreach (var t in CollectClothChainBones(root))
-                jointSet.Add(t.name);
+                jointSet.Add(HZGlbWriter.ExportJointName(t));
             foreach (var cloth in root.GetComponentsInChildren<MagicaCloth>(true))
             {
                 var ct = cloth.SerializeData.clothType;
@@ -103,7 +104,7 @@ namespace HZExporter
         }
 
         // Joints the model export emits = the non-null bones of the SMR with the most bones
-        // (the same "primary" the GLB skeleton is built from), keyed by raw bone.name.
+        // (the same "primary" the GLB skeleton is built from), keyed by exported joint name.
         static HashSet<string> JointSetFor(Renderer[] renderers)
         {
             var set = new HashSet<string>();
@@ -115,7 +116,7 @@ namespace HZExporter
                         primary = s;
             if (primary != null)
                 foreach (var b in primary.bones)
-                    if (b != null) set.Add(b.name);
+                    if (b != null) set.Add(HZGlbWriter.ExportJointName(b));
             return set;
         }
 
@@ -325,7 +326,7 @@ namespace HZExporter
                     // taken relative to that joint, so the offset stays correct even across pruned
                     // intermediates.
                     Transform bone = c.transform;
-                    while (bone != null && jointSet != null && !jointSet.Contains(bone.name)) bone = bone.parent;
+                    while (bone != null && jointSet != null && !jointSet.Contains(HZGlbWriter.ExportJointName(bone))) bone = bone.parent;
                     if (bone == null)
                     {
                         Debug.LogError($"[HZClothExporter] collider '{c.gameObject.name}' has no exported-joint " +
@@ -378,7 +379,7 @@ namespace HZExporter
                 }
 
                 FieldU(sb, 1, "type", type);
-                FieldS(sb, 1, "bone_name", bone.name);
+                FieldS(sb, 1, "bone_name", HZGlbWriter.ExportJointName(bone));
                 FieldV3(sb, 1, "local_pos", new Vector3(-lp.x, lp.y, lp.z));
                 FieldQuat(sb, 1, "local_rot", new Quaternion(lr.x, -lr.y, -lr.z, lr.w));
                 FieldU(sb, 1, "direction", direction);
@@ -426,7 +427,7 @@ namespace HZExporter
                     var t = stack.Pop();
                     if (!seen.Add(t)) continue;
                     boneTransforms.Add(t);
-                    boneNames.Add(t.name);
+                    boneNames.Add(HZGlbWriter.ExportJointName(t));
                     boneAttrs.Add(rootSet.Contains(t) ? 1 : 2); // 1=Fixed root, 2=Move
                     for (int i = 0; i < t.childCount; i++) stack.Push(t.GetChild(i));
                 }

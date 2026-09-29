@@ -2127,7 +2127,7 @@ public static class HZExportCommands
                     stableId = stableId,
                     parentStableId = parentStableId,
                     isBoneAttached = boneAnchor != null,
-                    boneAttachmentName = boneAnchor != null ? boneAnchor.name : null,
+                    boneAttachmentName = boneAnchor != null ? HZGlbWriter.ExportJointName(boneAnchor) : null,
                 };
 
                 // Check for skinned mesh (root of skinned hierarchy). SMRs that belong to a
@@ -2402,7 +2402,8 @@ public static class HZExportCommands
         {
             var d = kvp.Value;
             var animArray = d.animClips.Count > 0 ? d.animClips.ToArray() : null;
-            HZGlbWriter.ExportSkinnedMesh(d.smrs, d.materials, d.primarySmr, d.entityRoot, d.glbPath, animArray);
+            HZGlbWriter.ExportSkinnedMesh(d.smrs, d.materials, d.primarySmr, d.entityRoot, d.glbPath, animArray,
+                assetNameScope: kvp.Key);
         }
 
         // Timelines → EmoteBlobAsset .hzt (paths point at the just-baked GLB anims).

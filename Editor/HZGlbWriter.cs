@@ -365,7 +365,7 @@ namespace HZExporter
                     });
                     if (HZShaderMap.IsMToon(materials[mi]))
                     {
-                        mtoonExtras[mi] = HZShaderMap.EmbedMToon(materials[mi], bin, img =>
+                        mtoonExtras[mi] = HZShaderMap.EmbedMToon(materials[mi], matFactors[mi].baseColor, bin, img =>
                         {
                             imageEntries.Add((img.off, img.size, img.name, capturedMi, img.role));
                         });
@@ -658,10 +658,51 @@ namespace HZExporter
         /// is outside `bones[]` (e.g. an attached sub-character whose root bone hangs off the
         /// outer character's skeleton) has the chain above it baked into its rest TRS so the
         /// engine places it at the correct bind-pose location relative to the entity.</summary>
+        // Exported joint name per Transform, per skeleton subtree (see ExportJointName).
+        static readonly Dictionary<Transform, Dictionary<Transform, string>> s_jointNames =
+            new Dictionary<Transform, Dictionary<Transform, string>>();
+
+        /// <summary>Drops cached joint names; call at each export entry point.</summary>
+        public static void ResetJointNames() => s_jointNames.Clear();
+
+        /// <summary>The engine resolves joints by exact name (cloth bone_names, collider bones,
+        /// bone attachments), so same-named transforms in one skeleton (e.g. several bang
+        /// strands each with a "Bangs_jnt_R_02") are disambiguated: the first in depth-first
+        /// order keeps its name, later ones get "__1", "__2"... The scope is the subtree under
+        /// the scene root that holds `t` (the armature; meshes sit beside it), so the result
+        /// depends only on the hierarchy and every exporter that names a joint agrees.</summary>
+        public static string ExportJointName(Transform t)
+        {
+            if (t == null) return null;
+            var root = t;
+            while (root.parent != null && root.parent.parent != null) root = root.parent;
+            if (!s_jointNames.TryGetValue(root, out var names))
+            {
+                names = new Dictionary<Transform, string>();
+                var seen = new Dictionary<string, int>();
+                foreach (var x in root.GetComponentsInChildren<Transform>(true))
+                {
+                    seen.TryGetValue(x.name, out int n);
+                    seen[x.name] = n + 1;
+                    names[x] = n == 0 ? x.name : $"{x.name}__{n}";
+                }
+                foreach (var kv in seen)
+                    if (kv.Value > 1)
+                        Debug.LogWarning($"[HZGlbWriter] '{root.name}': {kv.Value} transforms named '{kv.Key}'; " +
+                                         $"exported as '{kv.Key}', '{kv.Key}__1'... (engine joints are name-keyed)");
+                s_jointNames[root] = names;
+            }
+            return names.TryGetValue(t, out var nm) ? nm : t.name;
+        }
+
         public static void ExportSkinnedMesh(SkinnedMeshRenderer[] smrs, Material[][] materialsPerSmr,
             SkinnedMeshRenderer primarySmr, Transform entityRoot, string outputPath,
-            AnimClipInfo[] animClips = null)
+            AnimClipInfo[] animClips = null, string assetNameScope = null)
         {
+            ResetJointNames();
+            // The engine cook writes glb materials/images to one flat, name-keyed dir, so two
+            // characters with same-named but different materials collide; scope them per character.
+            string scopePrefix = string.IsNullOrEmpty(assetNameScope) ? "" : assetNameScope + "__";
             // Flatten per-SMR material arrays into a single materials[] (one entry per
             // (smr, submesh) pair). matIndexPerSmr[smrIdx][submeshIdx] = index into flat materials[].
             // Per-submesh because a single SMR with multiple sub-meshes has one material per sub-mesh.
@@ -807,6 +848,47 @@ namespace HZExporter
                 }
             }
 
+            // The engine composes joint globals assuming parents precede children, but an SMR's
+            // bones[] need not be ordered that way (Juniper's hair SMR lists J_Bip_C_Head first,
+            // before its neck). Stable parent-first reorder: already-ordered skeletons are unchanged.
+            {
+                var order = new List<int>(jointCount);
+                var placed = new bool[jointCount];
+                void Place(int i)
+                {
+                    if (placed[i]) return;
+                    placed[i] = true;
+                    if (parentIndices[i] >= 0) Place(parentIndices[i]);
+                    order.Add(i);
+                }
+                // mark-before-recurse can't loop: Unity hierarchies are acyclic
+                for (int i = 0; i < jointCount; i++) Place(i);
+                bool moved = false;
+                for (int i = 0; i < jointCount && !moved; i++) moved = order[i] != i;
+                if (moved)
+                {
+                    var newBones = new Transform[jointCount];
+                    var newBind = new Matrix4x4[jointCount];
+                    for (int n = 0; n < jointCount; n++)
+                    {
+                        newBones[n] = bones[order[n]];
+                        newBind[n] = order[n] < bindPoses.Length ? bindPoses[order[n]] : Matrix4x4.identity;
+                    }
+                    bones = newBones;
+                    bindPoses = newBind;
+                    boneToIndex.Clear();
+                    for (int i = 0; i < jointCount; i++)
+                        if (bones[i] != null) boneToIndex[bones[i]] = i;
+                    for (int i = 0; i < jointCount; i++)
+                    {
+                        if (bones[i] == null) { parentIndices[i] = -1; continue; }
+                        var p = bones[i].parent;
+                        parentIndices[i] = (p != null && boneToIndex.TryGetValue(p, out int pi)) ? pi : -1;
+                    }
+                    Debug.Log($"[HZGlbWriter] reordered skeleton parent-first ({jointCount} joints)");
+                }
+            }
+
             var bin = new MemoryStream();
             var json = new StringBuilder();
 
@@ -865,6 +947,7 @@ namespace HZExporter
                 var vertices = mesh.vertices;
                 var normals = mesh.normals;
                 var tangents = mesh.tangents;
+                BakeRestBlendshapes(smr, vertices, normals, tangents);
                 var uvs = mesh.uv;
                 var uvs1 = mesh.uv2;   // UV1 / glTF TEXCOORD_1 / engine uvs1
                 WarnExtraUVs(mesh);
@@ -1359,7 +1442,7 @@ namespace HZExporter
                     });
                     if (HZShaderMap.IsMToon(materials[mi]))
                     {
-                        skinnedMtoon[mi] = HZShaderMap.EmbedMToon(materials[mi], bin, img =>
+                        skinnedMtoon[mi] = HZShaderMap.EmbedMToon(materials[mi], skinnedFactors[mi].baseColor, bin, img =>
                         {
                             skinnedImageEntries.Add((AddBV(img.off, img.size), capturedMi, img.name, img.role));
                         });
@@ -1395,7 +1478,7 @@ namespace HZExporter
                 for (int i = 0; i < skinnedImageEntries.Count; i++)
                 {
                     if (i > 0) json.Append(",\n");
-                    json.Append($"    {{ \"bufferView\": {skinnedImageEntries[i].bv}, \"mimeType\": \"image/png\", \"name\": \"{skinnedImageEntries[i].name}\" }}");
+                    json.Append($"    {{ \"bufferView\": {skinnedImageEntries[i].bv}, \"mimeType\": \"image/png\", \"name\": \"{scopePrefix}{skinnedImageEntries[i].name}\" }}");
                 }
                 json.Append("\n  ],\n");
 
@@ -1424,7 +1507,7 @@ namespace HZExporter
                 if (mi2 > 0) json.Append(",\n");
                 // Skinned materials get a `_skinned` suffix so the cooked material is identifiable
                 // as the skinned variant (mirrors the `_grass` naming for grass meshes).
-                string smatName = SanitizeName(materials[mi2]?.name ?? $"material_{mi2}") + "_skinned";
+                string smatName = scopePrefix + SanitizeName(materials[mi2]?.name ?? $"material_{mi2}") + "_skinned";
                 if (skinnedCustomMats[mi2] != null)
                 {
                     WriteCustomMaterialJson(json, smatName, skinnedCustomMats[mi2]);
@@ -1583,7 +1666,7 @@ namespace HZExporter
                 float px = p.x, py = p.y, pz = p.z;
                 float qx = q.x, qy = q.y, qz = q.z, qw = q.w;
 
-                string nodeName = bone != null ? bone.name : $"__null_bone_{i}";
+                string nodeName = bone != null ? ExportJointName(bone) : $"__null_bone_{i}";
                 json.Append($"    {{ \"name\": \"{EscapeJson(nodeName)}\"");
                 json.Append($", \"translation\": [{F(px)}, {F(py)}, {F(pz)}]");
                 json.Append($", \"rotation\": [{F(qx)}, {F(qy)}, {F(qz)}, {F(qw)}]");
@@ -1748,6 +1831,7 @@ namespace HZExporter
 
             json.Append(",\n      \"extensions\": {\n        \"VRMC_materials_mtoon\": {\n");
             json.Append("          \"specVersion\": \"1.0\",\n");
+            if (mt.alphaMode == 2) json.Append($"          \"transparentWithZWrite\": {(mt.transparentWithZWrite ? "true" : "false")},\n");
             json.Append($"          \"shadeColorFactor\": [{F(mt.shadeColor.r)}, {F(mt.shadeColor.g)}, {F(mt.shadeColor.b)}],\n");
             if (shadeIdx >= 0) json.Append($"          \"shadeMultiplyTexture\": {{ \"index\": {shadeIdx} }},\n");
             json.Append($"          \"shadingShiftFactor\": {F(mt.shadingShift)},\n");
@@ -1979,6 +2063,66 @@ namespace HZExporter
         {
             s_pngCache.Clear();
             s_ormPngCache.Clear();
+        }
+
+        // Bakes the SMR's authored (non-zero) blendshape weights into the base mesh, so the
+        // exported rest shape is what Unity renders. Morph targets stay linear deltas, so runtime
+        // weights compose on top exactly. Frames interpolate as Unity does.
+        static void BakeRestBlendshapes(SkinnedMeshRenderer smr, Vector3[] vertices, Vector3[] normals, Vector4[] tangents)
+        {
+            var mesh = smr.sharedMesh;
+            int n = mesh.vertexCount;
+            Vector3[] dV = null, dN = null, dT = null, dV0 = null, dN0 = null, dT0 = null;
+            bool baked = false;
+            for (int b = 0; b < mesh.blendShapeCount; b++)
+            {
+                float w = smr.GetBlendShapeWeight(b);
+                if (w == 0f) continue;
+                if (dV == null)
+                {
+                    dV = new Vector3[n]; dN = new Vector3[n]; dT = new Vector3[n];
+                    dV0 = new Vector3[n]; dN0 = new Vector3[n]; dT0 = new Vector3[n];
+                }
+                int fc = mesh.GetBlendShapeFrameCount(b);
+                int hi = 0;
+                while (hi < fc - 1 && mesh.GetBlendShapeFrameWeight(b, hi) < w) hi++;
+                float fwHi = mesh.GetBlendShapeFrameWeight(b, hi);
+                mesh.GetBlendShapeFrameVertices(b, hi, dV, dN, dT);
+                float fwLo = 0f, t;
+                if (hi == 0)
+                {
+                    System.Array.Clear(dV0, 0, n); System.Array.Clear(dN0, 0, n); System.Array.Clear(dT0, 0, n);
+                    t = w / fwHi;
+                }
+                else
+                {
+                    fwLo = mesh.GetBlendShapeFrameWeight(b, hi - 1);
+                    mesh.GetBlendShapeFrameVertices(b, hi - 1, dV0, dN0, dT0);
+                    t = (w - fwLo) / (fwHi - fwLo);
+                }
+                for (int i = 0; i < n; i++)
+                {
+                    vertices[i] += Vector3.LerpUnclamped(dV0[i], dV[i], t);
+                    if (normals != null && normals.Length == n) normals[i] += Vector3.LerpUnclamped(dN0[i], dN[i], t);
+                    if (tangents != null && tangents.Length == n)
+                    {
+                        Vector3 d = Vector3.LerpUnclamped(dT0[i], dT[i], t);
+                        tangents[i] = new Vector4(tangents[i].x + d.x, tangents[i].y + d.y, tangents[i].z + d.z, tangents[i].w);
+                    }
+                }
+                baked = true;
+                Debug.Log($"[HZ] '{smr.name}': baked rest blendshape '{mesh.GetBlendShapeName(b)}' weight {w}");
+            }
+            if (!baked) return;
+            for (int i = 0; i < n; i++)
+            {
+                if (normals != null && normals.Length == n) normals[i] = normals[i].normalized;
+                if (tangents != null && tangents.Length == n)
+                {
+                    Vector3 t3 = new Vector3(tangents[i].x, tangents[i].y, tangents[i].z).normalized;
+                    tangents[i] = new Vector4(t3.x, t3.y, t3.z, tangents[i].w);
+                }
+            }
         }
 
         // Returns PNG bytes for the given texture asset, computing+caching on first touch.

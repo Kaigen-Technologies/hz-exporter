@@ -425,6 +425,7 @@ namespace HZExporter
             public bool shadeUsesAlbedo = false;         // shadeMultiplyTexture == baseColorTexture
             public int alphaMode = 0;                    // 0 opaque, 1 mask, 2 blend
             public float alphaCutoff = 0.5f;
+            public bool transparentWithZWrite = false;   // transparentWithZWrite (BLEND only)
             public bool doubleSided = false;
             // non-spec extensions (forked MToon10): Highlight third tone + Face Shading
             public Color highlightColor = Color.white;   // mtoon_ext.highlightColorFactor (rgb)
@@ -459,8 +460,9 @@ namespace HZExporter
         /// <summary>Read MToon10 params and embed the MToon-specific textures (shade role 4,
         /// matcap role 5, rim role 6). When the shade texture is the same asset as the base
         /// albedo, no new image is embedded — shadeUsesAlbedo flags the writer to reference the
-        /// existing baseColorTexture index instead (matches the source VRoid).</summary>
-        public static MToonExtras EmbedMToon(Material mat, MemoryStream bin, System.Action<ImageRecord> onImage)
+        /// existing baseColorTexture index instead (matches the source VRoid). `litColor` is the
+        /// exported baseColorFactor, needed to lower Flat Lit.</summary>
+        public static MToonExtras EmbedMToon(Material mat, Color litColor, MemoryStream bin, System.Action<ImageRecord> onImage)
         {
             var e = new MToonExtras();
             if (mat == null) return e;
@@ -478,6 +480,7 @@ namespace HZExporter
             if (mat.HasProperty("_RimLightingMix")) e.rimLightingMix = mat.GetFloat("_RimLightingMix");
             if (mat.HasProperty("_AlphaMode")) e.alphaMode = Mathf.RoundToInt(mat.GetFloat("_AlphaMode"));
             if (mat.HasProperty("_Cutoff")) e.alphaCutoff = mat.GetFloat("_Cutoff");
+            if (mat.HasProperty("_TransparentWithZWrite")) e.transparentWithZWrite = mat.GetFloat("_TransparentWithZWrite") >= 0.5f;
             if (mat.HasProperty("_DoubleSided")) e.doubleSided = mat.GetFloat("_DoubleSided") > 0.5f;
             if (mat.HasProperty("_HighlightColor")) e.highlightColor = ReadColor(mat, "_HighlightColor");
             if (mat.HasProperty("_HighlightShift")) e.highlightShift = mat.GetFloat("_HighlightShift");
@@ -509,7 +512,20 @@ namespace HZExporter
             Texture2D baseTex = (mat.HasProperty("_MainTex") ? mat.GetTexture("_MainTex") : null) as Texture2D;
             if (baseTex == null && mat.HasProperty("_BaseMap")) baseTex = mat.GetTexture("_BaseMap") as Texture2D;
 
-            var shadeTex = (mat.HasProperty("_ShadeTex") ? mat.GetTexture("_ShadeTex") : null) as Texture2D;
+            // Flat Lit (non-spec fork ext) forces shade = 1 and drops the highlight. At lighting
+            // mix 1 that is exactly shade == lit, so it lowers onto spec params the engine has.
+            bool flatLit = mat.HasProperty("_FlatLitEnabled") && mat.GetFloat("_FlatLitEnabled") >= 0.5f;
+            if (flatLit)
+            {
+                float mix = mat.HasProperty("_FlatLitLightingMix") ? mat.GetFloat("_FlatLitLightingMix") : 1f;
+                if (mix < 0.999f)
+                    Debug.LogWarning($"[HZ] '{mat.name}': Flat Lit lighting mix {mix} has no engine equivalent; exported as mix 1");
+                e.shadeColor = litColor;
+                e.highlightEnabled = 0f;
+            }
+
+            var shadeTex = flatLit ? baseTex
+                : (mat.HasProperty("_ShadeTex") ? mat.GetTexture("_ShadeTex") : null) as Texture2D;
             if (shadeTex != null)
             {
                 if (shadeTex == baseTex) e.shadeUsesAlbedo = true;
@@ -526,13 +542,30 @@ namespace HZExporter
             var nervousTex = (mat.HasProperty("_NervousMask") ? mat.GetTexture("_NervousMask") : null) as Texture2D;
             if (nervousTex != null) EmbedRoleTexture(nervousTex, false, 9, bin, onImage);
             var starEyesTex = (mat.HasProperty("_StarEyesMask") ? mat.GetTexture("_StarEyesMask") : null) as Texture2D;
-            if (starEyesTex != null) EmbedRoleTexture(starEyesTex, false, 10, bin, onImage);
+            // unset mask samples Unity's "black" default = (0,0,0,0), a no-op decal; the engine's
+            // unbound @black fallback is opaque and paints the eyes black, so embed the real default.
+            EmbedRoleTexture(starEyesTex != null ? starEyesTex : ClearTexture(), false, 10, bin, onImage);
             var tearyNoiseTex = (mat.HasProperty("_TearyNoiseTex") ? mat.GetTexture("_TearyNoiseTex") : null) as Texture2D;
             if (tearyNoiseTex != null) EmbedRoleTexture(tearyNoiseTex, false, 11, bin, onImage);
+            // unset noise samples Unity's "gray" default = zero displacement; the engine's
+            // unbound fallback is black (a constant offset), so lower it to amplitude 0.
+            else e.tearyAmplitude = 0f;
             var tearyMaskTex = (mat.HasProperty("_TearyMask") ? mat.GetTexture("_TearyMask") : null) as Texture2D;
             if (tearyMaskTex != null) EmbedRoleTexture(tearyMaskTex, false, 12, bin, onImage);
 
             return e;
+        }
+
+        static Texture2D s_clearTex;
+
+        // 1x1 transparent black: Unity's "black" texture default, which no engine fallback matches
+        static Texture2D ClearTexture()
+        {
+            if (s_clearTex != null) return s_clearTex;
+            s_clearTex = new Texture2D(1, 1, TextureFormat.RGBA32, false) { name = "hz_clear", hideFlags = HideFlags.HideAndDontSave };
+            s_clearTex.SetPixel(0, 0, new Color(0f, 0f, 0f, 0f));
+            s_clearTex.Apply();
+            return s_clearTex;
         }
 
         static void EmbedRoleTexture(Texture2D tex, bool isNormal, int role, MemoryStream bin, System.Action<ImageRecord> onImage)
